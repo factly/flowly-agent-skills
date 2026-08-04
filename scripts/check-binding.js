@@ -137,10 +137,25 @@ const ALLOWED_MENTIONS = [
 ];
 
 /**
- * Files whose destination was rebound, and the successor each must name.
+ * Files whose binding must name the Flowly capability that carries it.
  *
- * Any one token satisfies the row. Tokens are Flowly MCP tool names, verified
- * against a live tools/list, except where the row's successor is a command.
+ * `tokens` is any-of: one of them present satisfies the row. `all` is every-of:
+ * each must be present. Tokens are Flowly MCP tool names, verified against a
+ * live tools/list, except where the row's successor is a command or a phrase
+ * this script owns.
+ *
+ * Two shapes of row live here, and the difference is worth naming because it is
+ * why one of them needed its own task. Most rows below replace a *path*: the
+ * file said "write it to tasks/plan.md" and now says "put_planning_doc". Those
+ * are found by grepping for the path, and the row exists to prove a successor
+ * was named rather than the instruction merely deleted.
+ *
+ * The last three rows replace a *convention* — a commit-message shape, a
+ * release mapping, where a review verdict lives. Those files contain no path at
+ * all, so no grep finds them, and nothing would ever have reported them as
+ * unbound. They are here because a sweep can only find the vocabulary it
+ * already knows, and an inherited file whose binding is a convention is
+ * invisible to the sweep that found all the others.
  */
 const REQUIRED_BINDINGS = [
   {
@@ -197,6 +212,30 @@ const REQUIRED_BINDINGS = [
     file: 'evals/cases/planning-and-task-breakdown.json',
     tokens: ['planning doc'],
     reason: 'the expected output it grades against must be the artifact this fork produces',
+  },
+
+  // --- bindings that are a convention rather than a path ---
+
+  {
+    file: 'skills/git-workflow-and-versioning/SKILL.md',
+    all: ['FLO-', 'link_pull_request'],
+    reason:
+      'the commit convention names the issue, and the PR is recorded against it — link_pull_request ' +
+      'moves no status and attaches no evidence, so saying so is part of the binding',
+  },
+  {
+    file: 'skills/shipping-and-launch/SKILL.md',
+    all: ['create_release', 'add_issue_to_release', 'ships nothing by itself'],
+    reason:
+      'a release is a Flowly object that groups issues and carries a status; creating one deploys ' +
+      'nothing, and a reader who assumes otherwise ships by filling in a form',
+  },
+  {
+    file: 'skills/code-review-and-quality/SKILL.md',
+    all: ['get_loop_run', 'advance_loop_run'],
+    reason:
+      "the verdict on built work lives on the run, not on the issue — the issue's review_state is " +
+      'the plan gate, a different gate at a different time',
   },
 ];
 
@@ -325,16 +364,28 @@ function checkForbiddenDestinations(files, report) {
 // Check 3 — a removed destination with no named successor is a capability loss.
 function checkRequiredBindings(byRel, report) {
   let errors = 0;
-  for (const { file, tokens, reason } of REQUIRED_BINDINGS) {
+  for (const { file, tokens, all, reason } of REQUIRED_BINDINGS) {
     const text = byRel.get(file);
     if (text === undefined) {
       report.error(`${file} is in REQUIRED_BINDINGS but is not in the scanned tree`);
       errors += 1;
       continue;
     }
-    if (tokens.some((t) => text.includes(t))) continue;
-    report.error(`${file} names none of ${tokens.join(', ')} — ${reason}`);
-    errors += 1;
+    if (tokens !== undefined && !tokens.some((t) => text.includes(t))) {
+      report.error(`${file} names none of ${tokens.join(', ')} — ${reason}`);
+      errors += 1;
+      continue;
+    }
+    // Report every missing token, not just the first: these rows carry three
+    // separate claims, and fixing them one round-trip at a time is how a
+    // convention binding ends up half made.
+    if (all !== undefined) {
+      const missing = all.filter((t) => !text.includes(t));
+      if (missing.length > 0) {
+        report.error(`${file} is missing ${missing.map((m) => `"${m}"`).join(', ')} — ${reason}`);
+        errors += 1;
+      }
+    }
   }
   if (errors === 0) {
     report.pass(`${REQUIRED_BINDINGS.length} rebound file(s) each name their successor capability`);

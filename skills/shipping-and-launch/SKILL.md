@@ -263,6 +263,19 @@ Every deployment needs a rollback plan before it happens:
 - Redeploy previous version: < 5 minutes
 - Database rollback: < 15 minutes
 ```
+
+## Recording What Shipped
+
+Deploying and recording what you deployed are two different jobs, and only the first one changes production. Whatever the project uses to answer "what went out, and when?" — a tagged release, a changelog entry, a release page — write it in the same pass as the deploy, while you still remember what was in it.
+
+When the work is tracked in Flowly, that record is a **release**: a named object that groups issues and carries a status.
+
+- `create_release(name, description, version, target_date)` — `name` must be unique within the team and `description` is markdown. `version` is free text: Flowly enforces no versioning policy and does not require it to be unique, so the semantic-versioning discipline in `git-workflow-and-versioning` is yours to keep, not the tracker's to enforce. `target_date` is `YYYY-MM-DD` and may be left unset while the release is still being planned — the roadmap lists undated releases rather than hiding them. Over this door `version` and `target_date` are set-only: the door can't tell an omitted argument from an explicit null, so clear either one from the web app.
+- `add_issue_to_release(release_id, identifier)` — puts one issue in the bundle. Adding the same issue twice succeeds and changes nothing, and an issue may belong to several releases at once, so a new membership displaces none of the existing ones.
+- `update_release` moves the status: it starts at `planned`, and goes to `in_progress`, `released` or `canceled`. A release is never deleted — one that will not happen ends at `canceled`.
+
+**A release ships nothing by itself.** Creating one deploys no code, and setting its status to `released` flips no feature flag, notifies no user and starts no rollout. It is the record of what went out together. Everything above in this skill — the checklist, the flag, the staged rollout, the rollback plan — is the part that actually ships. Filling in the form is not a launch.
+
 ## See Also
 
 - For the project-wide Definition of Done that every change must clear before this checklist, see `references/definition-of-done.md`

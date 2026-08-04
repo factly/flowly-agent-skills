@@ -90,8 +90,9 @@ Every file this fork ships from upstream's content trees is listed below with a 
 an upstream merge may do to it. This table is what a merge is resolved against, so it is only worth
 having if it is true: `scripts/check-register.js` reads it and asserts that the tree and the table
 describe the same set of files, that every status is one of the four words defined below, that the
-base SHA above is a real commit and an ancestor of `HEAD`, and that every file marked `unchanged` is
-byte-identical to its blob at that SHA.
+base SHA above is a real commit and an ancestor of `HEAD`, that every file marked `unchanged` is
+byte-identical to its blob at that SHA, and that every file marked `bound` exists at that SHA and
+differs from it.
 
 ### Scope
 
@@ -113,7 +114,7 @@ merge conflict in this directory means upstream has started using a path we took
 | Status | Meaning |
 |---|---|
 | `unchanged` | Inherited from upstream and byte-identical to the base SHA. Merges freely; a conflict here means upstream moved and we did not. |
-| `bound` | Inherited, then edited to point at Flowly instead of the filesystem. Every merge that touches one of these needs review by eye, because upstream reverting a destination is the one failure that is silent. |
+| `bound` | Inherited, then edited to point at Flowly — instead of at the filesystem, or instead of at a convention that assumed no tracker. Every merge that touches one of these needs review by eye, because upstream reverting a binding is the one failure that is silent. |
 | `owned` | An inherited path we have taken over. Never merged from upstream. |
 | `new` | Ours outright, with no upstream counterpart. |
 
@@ -154,7 +155,7 @@ carried would have been an unverified claim.
 | `skills/api-and-interface-design/SKILL.md` | `unchanged` |
 | `skills/browser-testing-with-devtools/SKILL.md` | `unchanged` |
 | `skills/ci-cd-and-automation/SKILL.md` | `unchanged` |
-| `skills/code-review-and-quality/SKILL.md` | `unchanged` |
+| `skills/code-review-and-quality/SKILL.md` | `bound` |
 | `skills/code-simplification/SKILL.md` | `unchanged` |
 | `skills/context-engineering/SKILL.md` | `bound` |
 | `skills/debugging-and-error-recovery/SKILL.md` | `unchanged` |
@@ -165,7 +166,7 @@ carried would have been an unverified claim.
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
-| `skills/git-workflow-and-versioning/SKILL.md` | `unchanged` |
+| `skills/git-workflow-and-versioning/SKILL.md` | `bound` |
 | `skills/idea-refine/SKILL.md` | `bound` |
 | `skills/idea-refine/examples.md` | `unchanged` |
 | `skills/idea-refine/frameworks.md` | `unchanged` |
@@ -176,7 +177,7 @@ carried would have been an unverified claim.
 | `skills/performance-optimization/SKILL.md` | `bound` |
 | `skills/planning-and-task-breakdown/SKILL.md` | `bound` |
 | `skills/security-and-hardening/SKILL.md` | `unchanged` |
-| `skills/shipping-and-launch/SKILL.md` | `unchanged` |
+| `skills/shipping-and-launch/SKILL.md` | `bound` |
 | `skills/source-driven-development/SKILL.md` | `unchanged` |
 | `skills/spec-driven-development/SKILL.md` | `bound` |
 | `skills/test-driven-development/SKILL.md` | `unchanged` |

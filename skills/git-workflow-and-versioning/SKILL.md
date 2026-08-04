@@ -93,6 +93,16 @@ update auth.ts
 - `docs` — Documentation only
 - `chore` — Tooling, dependencies, config
 
+**Reference the tracker:** If the project already has a convention for naming its tracker in a commit, follow it. When the work is tracked on a Flowly issue and no convention exists, put the issue identifier in the scope — or on its own line in the body, if the project keeps the subject scope-free — so `git log` alone can answer "which issue is this, and where do I read why?":
+
+```
+feat(FLO-1234): add email validation to registration endpoint
+```
+
+The same identifier ties the pull request to the issue. Open the PR, then call `link_pull_request(identifier, url)` with the PR's URL exactly as the browser shows it — `https://github.com/{owner}/{repo}/pull/{number}`. An `/issues/` link, an API link, or anything that is not a pull request is refused rather than guessed at, and the PR has to live in the repository the issue's project is linked to. Calling it twice for the same PR is safe and changes nothing.
+
+Do it when you open the PR, not when it merges: Flowly re-reads the PR's state from GitHub whenever someone looks at the issue, so a merge that lands hours after your session ends still reaches it. And the link is only a link — **it moves no status and attaches no evidence.** Whether a merged PR actually finishes the issue is a judgement for you or a human, recorded with `update_issue`; the proof that it works is `attach_evidence` against the run id.
+
 ### 4. Keep Concerns Separate
 
 Don't combine formatting changes with behavior changes. Don't combine refactors with features. Each type of change should be a separate commit — and ideally a separate PR:

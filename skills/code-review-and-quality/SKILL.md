@@ -346,6 +346,22 @@ For triaging `npm audit` findings and supply-chain risk (typosquatting, compromi
 - [ ] **Approve** — Ready to merge
 - [ ] **Request changes** — Issues must be addressed
 ```
+
+## Where the Verdict Lives
+
+A verdict has to be recorded somewhere a later reader will find it, and in most projects that is the pull request's own review UI. When the work is tracked on a Flowly issue it is the **loop run** — and the trap worth naming first is that Flowly has two review gates, at two different times, about two different things. Conflating them is how a code review gets filed against a plan that was approved days earlier.
+
+| Gate | Read with | Decides | When |
+|---|---|---|---|
+| The issue's `review_state` | `get_review(identifier)` | the plan — is this the right work? | before anything is built |
+| The loop run's verdict | `get_loop_run(run_id)` | the code — is the built work good? | after the work exists |
+
+`get_loop_run(run_id)` returns the run's status, its phase (`plan` or `build`), and its gates — `{start, phase, ship}`. **A gate that is true is a step you cannot take.** It has to be taken by a human, and attempting it is refused rather than queued. `ship` is true for every run, so no run reaches `completed` without a human approving it.
+
+`advance_loop_run(run_id, status, phase)` is the agent's half of that. It accepts `running`, `awaiting_review`, `completed`, `failed` and `canceled` — and it **rejects `approved` and `changes_requested`, because those two are the human's verdict.** Reaching `awaiting_review` is where your part ends.
+
+So the five-axis judgement above is still yours to form and to write down; what changes is who records it as the run's state. Post the findings — `add_comment` on the issue, or `attach_evidence` on the run — advance the run to `awaiting_review`, and stop there. Two refusals you will meet on the way are normal parts of the loop rather than errors to work around: `-> completed` is refused until the run has been approved, and `plan -> build` is refused until the issue's plan is approved.
+
 ## See Also
 
 - For detailed security review guidance, see `references/security-checklist.md`

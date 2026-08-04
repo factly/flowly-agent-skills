@@ -206,6 +206,19 @@ function trackedInScope() {
   return out.split('\0').filter(p => p !== '');
 }
 
+/**
+ * Each check accumulates two kinds of line in one array: a failure, and a `↳`
+ * hint explaining how to fix it. `report` tells them apart by prefix when it
+ * prints, but the count returned to the summary line did not — so three failing
+ * files reported as nine errors, and the number a reader trusts most was the
+ * one number that was wrong. Count failures; hints are formatting.
+ */
+const HINT_PREFIX = '  \u21b3';
+
+function countFailures(errors) {
+  return errors.filter(e => !e.startsWith(HINT_PREFIX)).length;
+}
+
 function checkCompleteness(rows, tracked, report) {
   const errors  = [];
   const inTree  = new Set(tracked);
@@ -238,7 +251,7 @@ function checkCompleteness(rows, tracked, report) {
     'bidirectional completeness',
     `${tracked.length} tracked file(s) in scope, ${rows.length} register row(s), matched exactly`,
   );
-  return errors.length;
+  return countFailures(errors);
 }
 
 function checkStatuses(rows, report) {
@@ -255,7 +268,7 @@ function checkStatuses(rows, report) {
 
   const summary = STATUSES.map(s => `${s} ${tally.get(s)}`).join(', ');
   report(errors, 'status validity', `${rows.length} status(es) valid — ${summary}`);
-  return errors.length;
+  return countFailures(errors);
 }
 
 function checkBaseSha(sha, report) {
@@ -273,7 +286,7 @@ function checkBaseSha(sha, report) {
   }
 
   report(errors, 'base SHA', `${sha} is a commit and an ancestor of HEAD`);
-  return errors.length;
+  return countFailures(errors);
 }
 
 /**
@@ -324,7 +337,7 @@ function checkSkillPrefix(rows, report) {
     'skill directory naming',
     `${skills.size} skill(s) — ${nativeCount} ours (prefixed \`${PREFIX}\`), ${skills.size - nativeCount} inherited (upstream names)`,
   );
-  return errors.length;
+  return countFailures(errors);
 }
 
 function checkUnchanged(rows, sha, upstream, report) {
@@ -355,7 +368,7 @@ function checkUnchanged(rows, sha, upstream, report) {
     '`unchanged` really is unchanged',
     `${marked.length} file(s) marked unchanged are byte-identical to the base`,
   );
-  return errors.length;
+  return countFailures(errors);
 }
 
 function checkBound(rows, sha, upstream, report) {
@@ -390,7 +403,7 @@ function checkBound(rows, sha, upstream, report) {
     '`bound` really is bound',
     `${marked.length} file(s) marked bound are inherited and do differ from the base`,
   );
-  return errors.length;
+  return countFailures(errors);
 }
 
 // ─── Main ────────────────────────────────────────────────────────────────────
@@ -406,7 +419,7 @@ function main() {
     }
     console.log(`  ✗  ${name}`);
     for (const msg of errors) {
-      console.log(msg.startsWith('  ↳') ? `       ${msg}` : `       ERROR: ${msg}`);
+      console.log(msg.startsWith(HINT_PREFIX) ? `       ${msg}` : `       ERROR: ${msg}`);
     }
   };
 
