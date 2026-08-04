@@ -100,8 +100,11 @@ lifecycle commands are authored later, and will be registered as `new`.
 | `owned` | An inherited path we have taken over. Never merged from upstream. |
 | `new` | Ours outright, with no upstream counterpart. |
 
-At the fork every file is `unchanged`: no binding edits have been made yet. That is the correct
-starting state, and it is exactly what makes the first monthly merge reviewable.
+At the fork every file was `unchanged` — the correct starting state, and what makes the first monthly
+merge reviewable. Rows leave that state one at a time, and each departure is a claim a check can
+test: `new` and `owned` skill directories must carry the `flowly-` prefix, `unchanged` ones must
+still be byte-identical to the base. Nothing inherited has been edited in place yet; every non-
+`unchanged` row so far is a file with no upstream counterpart.
 
 ### Files
 
@@ -128,6 +131,8 @@ starting state, and it is exactly what makes the first monthly merge reviewable.
 | `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
 | `skills/documentation-and-adrs/SKILL.md` | `unchanged` |
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
+| `skills/flowly-plan/SKILL.md` | `new` |
+| `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
 | `skills/git-workflow-and-versioning/SKILL.md` | `unchanged` |
 | `skills/idea-refine/SKILL.md` | `unchanged` |

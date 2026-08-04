@@ -1,0 +1,43 @@
+{
+  "skill_name": "flowly-plan",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Write the planning docs for FLO-1234 and submit them for review",
+        "top_k": 3
+      },
+      {
+        "prompt": "Break this Flowly issue into a task list and hand the plan to the gate",
+        "top_k": 3
+      },
+      {
+        "prompt": "Plan FLO-482 in Flowly — research, plan, todo and risks, then wait for approval",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Debug the crash on startup",
+        "owner": "debugging-and-error-recovery"
+      },
+      {
+        "prompt": "Review the staged diff for correctness and security problems",
+        "owner": "code-review-and-quality"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Plan out the work for adding saved filters to the issue list.",
+      "expected_output": "A request for the Flowly issue identifier, with no planning artifact written to the working tree",
+      "expectations": [
+        "The agent asks which Flowly issue the plan belongs to instead of assuming one",
+        "No plan, todo, or spec file is created in the working tree",
+        "The agent does not offer writing a local file as the fallback when no identifier is available",
+        "Once an identifier is supplied, the plan is described as going to the issue's planning docs rather than to disk"
+      ]
+    }
+  ]
+}
