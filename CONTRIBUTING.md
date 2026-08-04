@@ -78,7 +78,9 @@ We don't accept translations of the documentation (README, `docs/`) or of skills
 
 ## Testing Hooks
 
-The session-start hook (`hooks/session-start.sh`) injects the `using-agent-skills` meta-skill into every new Claude Code session. A regression test at `hooks/session-start-test.sh` validates the hook's JSON payload — both when `jq` is available and when it isn't.
+The session-start hook (`hooks/session-start.sh`) injects the `using-agent-skills` meta-skill into every new Claude Code session. A regression test at `hooks/session-start-test.sh` validates the hook's JSON payload.
+
+**The hook's runtime dependency is bash (3.2 or newer) and nothing else.** It builds its JSON with shell builtins — no `jq`, no `node`, no coreutils — so it works on a machine with an empty `PATH`, and the test runs it that way to keep it honest. Anything you add to it must hold that line: reaching for an external tool trades one install-time failure for another, on a hook whose failure mode is a session that quietly starts without the catalog.
 
 Run it before opening any PR that touches:
 
@@ -91,19 +93,17 @@ bash hooks/session-start-test.sh
 
 Expected output: `session-start JSON payload OK`. The script exits non-zero on any assertion failure.
 
-### Reproducing the no-jq fallback
+### Exercising the escaping
 
-The hook gracefully degrades to an `INFO`-priority payload when `jq` isn't on `PATH`. To exercise that branch locally, strip `jq`'s directory from `PATH` for the test invocation:
+The payload is one JSON string containing a whole markdown file, escaped by hand in bash. The shipped
+`using-agent-skills/SKILL.md` happens to contain no backslashes and no control characters, so a
+round-trip against it alone cannot see a broken backslash or `\u00xx` rule — it passes either way.
+The test therefore also runs an adversarial fixture (backslashes, one of them immediately before a
+newline, quotes, tabs, CRLF, several C0 controls, box drawing, no trailing newline) and compares the
+decoded message byte-for-byte rather than merely asserting that it parses.
 
-```bash
-JQ_DIR=$(dirname "$(command -v jq)")
-PATH=$(echo "$PATH" | tr ':' '\n' | grep -v "^${JQ_DIR}$" | tr '\n' ':' | sed 's/:$//') \
-  bash hooks/session-start-test.sh
-```
-
-This works cleanly when `jq` lives in its own directory (e.g. `/opt/homebrew/bin` from Homebrew, `/usr/local/bin` from a manual install). If your `jq` shares a system bin with other tools the test depends on (such as `mktemp` in `/usr/bin`), the simpler approach is to install `jq` via a separate package manager so it has its own bin directory, then re-run.
-
-The hook's `command -v jq` check fails under the stripped `PATH`, the `INFO`-priority fallback runs, and the test asserts the `jq is required` guidance message instead of the normal payload.
+If you change the escaping, change that fixture too, and check the new case actually fails before
+your fix.
 
 ## Reporting Issues
 
