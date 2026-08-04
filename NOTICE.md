@@ -146,6 +146,7 @@ still be byte-identical to the base. Nothing inherited has been edited in place 
 | `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
 | `skills/documentation-and-adrs/SKILL.md` | `unchanged` |
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
+| `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |

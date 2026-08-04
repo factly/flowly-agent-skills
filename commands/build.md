@@ -1,6 +1,6 @@
 ---
-description: Implement an approved Flowly issue's child issues one at a time, updating each in Flowly
-argument-hint: FLO-1234 (issue identifier)
+description: Implement an approved Flowly issue's children in Flowly. Add "auto" to work all of them in one pass.
+argument-hint: FLO-1234, or "auto FLO-1234" for the whole plan
 ---
 
 Implement the work an approved Flowly plan broke out, one child issue at a time.
@@ -23,31 +23,45 @@ most recent issue. And do not fall back to writing a plan, a spec, a todo list, 
 to a local file — every artifact belongs to the issue, and a local file is the exact failure this
 distribution exists to prevent.
 
-## Check the gate before writing code
+## Select the mode
 
-`get_review(identifier)` must report `approved`. If it reports anything else — `none`, `planning`,
-`in_review`, `changes_requested` — stop and say so. An unapproved plan is not a plan to build.
+The arguments carry two independent things and they may arrive in either order: the identifier you
+just resolved, and optionally a mode word. Read each out of the argument text separately. Do not
+test the whole argument against the mode words — `auto FLO-1234` is both, and matching the whole
+string selects single-task mode on the very invocation that asked for the opposite.
 
-`list_issues` filtered to this issue's children gives the work the approved `todo` doc produced. If
-there are none, `convert_todo_to_issues(identifier)` creates them.
+- **`auto`, or `all`** — autonomous: work every remaining child to done without stopping between
+  them.
+- **anything else, or nothing** — the default: work the next child, then stop.
 
-## Work one child issue at a time
+Autonomous is not faster per child. Same loop, same tests, same one commit per child; it removes the
+human step between children and nothing else.
 
-For each child, in dependency order, one at a time:
+## Check the gate
 
-1. `update_issue` to move it into progress before you touch a file.
-2. Invoke the flowly:incremental-implementation skill — the smallest change that makes one thing
-   work, not the whole slice at once. Invoke the flowly:test-driven-development skill for the logic:
-   a failing test first, then the code that passes it.
-3. Run the project's own checks. Green before you move on.
-4. Commit that child's work as one commit, containing only that child's work.
-5. `update_issue` to move it to done, and `add_comment` with what changed and anything the next
-   child needs to know.
+`get_review(identifier)` must report `approved`. Anything else — `none`, `planning`, `in_review`,
+`changes_requested` — means stop and say so. There is no file to look for and no spec on disk; the
+gate is the human decision recorded on the issue.
 
-The flowly:flowly-build skill carries the Build phase workflow.
+## Work the children
+
+`get_issue` gives the parent its own id and project. `list_issues` on that project returns every
+issue in it, each carrying a `parent_id`; the children are the ones that match. There is no parent
+filter, and the list is capped and newest-first, so **sort the matches by issue number ascending**.
+That is the dependency order conversion produced; the returned order is its reverse. With no
+children yet, `convert_todo_to_issues(identifier)` creates them.
+
+Then, one child at a time: `update_issue` it into progress, invoke the flowly:flowly-build skill for
+the loop, and `update_issue` it to done with an `add_comment` saying what changed. One commit per
+child, containing only that child's work.
+
+Re-invoking resumes from the tracker, not from a file: the next child is the lowest-numbered one
+that is not done and not canceled. A child sitting in progress means an earlier run stopped inside
+it — read it, and the working tree, before carrying on.
 
 ## Stop conditions
 
-Stop and ask when a child's acceptance criteria turn out to be wrong, when the work needs a decision
-the plan did not make, or when a check goes red for a reason outside the child you are on. Do not
-widen a child's scope to absorb the surprise — take it back to the plan.
+Stop and ask when a child's acceptance turns out to be wrong, when the work needs a decision the
+plan did not make, when a check goes red for a reason outside the child you are on, or when the
+child count disagrees with the plan. Do not widen a child to absorb the surprise, and in autonomous
+mode do not push past one of these — take it back to the plan.

@@ -75,9 +75,9 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 25 Skills
+## All 26 Skills
 
-The pack includes 25 skills total — 24 lifecycle skills plus the `using-agent-skills` meta-skill. One of them, `flowly-plan`, is ours; the rest are inherited. The Flowly-native set grows as the remaining phases land. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-skills` meta-skill. Two of them, `flowly-plan` and `flowly-build`, are ours; the rest are inherited. The Flowly-native set grows as the remaining phases land. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 ### Meta - Discover which skill applies
 
@@ -104,6 +104,7 @@ The pack includes 25 skills total — 24 lifecycle skills plus the `using-agent-
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-build](skills/flowly-build/SKILL.md) | Walk an approved plan's child issues one at a time — derive the queue from the tracker, order it, move each through the statuses, commit once per child | A parent issue's plan gate reports approved and its children exist |
 | [incremental-implementation](skills/incremental-implementation/SKILL.md) | Thin vertical slices - implement, test, verify, commit. Feature flags, safe defaults, rollback-friendly changes | Any change touching more than one file |
 | [test-driven-development](skills/test-driven-development/SKILL.md) | Red-Green-Refactor, test pyramid (80/15/5), test sizes, DAMP over DRY, Beyonce Rule, browser testing | Implementing logic, fixing bugs, or changing behavior |
 | [context-engineering](skills/context-engineering/SKILL.md) | Feed agents the right information at the right time - rules files, context packing, MCP integrations | Starting a session, switching tasks, or when output quality drops |
@@ -208,7 +209,7 @@ Every skill follows a consistent anatomy:
 
 ```
 flowly-agent-skills/
-├── skills/                            # 25 skills (24 lifecycle + 1 meta)
+├── skills/                            # 26 skills (25 lifecycle + 1 meta)
 ├── agents/                            # 4 specialist personas
 ├── references/                        # 7 supplementary checklists
 ├── commands/                          # the 6 lifecycle commands, each taking an issue identifier

@@ -1,0 +1,43 @@
+{
+  "skill_name": "flowly-build",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Work through FLO-1234's child issues one at a time and update each in Flowly",
+        "top_k": 3
+      },
+      {
+        "prompt": "The plan for this Flowly issue is approved — start building the children",
+        "top_k": 3
+      },
+      {
+        "prompt": "Resume the autonomous build on FLO-482, picking up wherever it stopped",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Break this spec into small verifiable tasks with acceptance criteria",
+        "owner": "planning-and-task-breakdown"
+      },
+      {
+        "prompt": "Interview me about what I actually want before proposing anything",
+        "owner": "interview-me"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Go ahead and build the whole plan automatically.",
+      "expected_output": "A request for the Flowly issue whose plan is approved, with no code written and no local task list created",
+      "expectations": [
+        "The agent asks which Flowly issue the approved plan belongs to instead of assuming one",
+        "No task list, plan, or checklist file is created in the working tree",
+        "The agent does not begin editing code before it has an issue and an approved plan gate",
+        "Autonomous mode is described as removing the step between children, not as skipping their tests or commits"
+      ]
+    }
+  ]
+}

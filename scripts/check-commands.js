@@ -31,22 +31,31 @@
  *      at `command_migration.rs:166`).
  *   5. The canonical `## Resolve the issue` block is present verbatim in all
  *      six. This script owns the exact string.
- *   6. Every `flowly:<skill>` a command names resolves to a directory under
+ *   6. commands/build.md carries the canonical `## Select the mode` block, and
+ *      no other command carries one. Upstream tested its whole argument against
+ *      the mode words, so a mode plus an identifier selected single-task mode —
+ *      silently, on the one invocation that asked for the opposite.
+ *   7. No command names a local planning destination. The narrow, early version
+ *      of the binding rule: this is the layer where those paths were enforced
+ *      rather than merely suggested, including as a clean-baseline whitelist.
+ *   8. Every `flowly:<skill>` a command names resolves to a directory under
  *      `skills/`, or is declared in PLANNED_SKILLS with a reason. That map is
  *      self-retiring: an entry whose skill now exists on disk is an error, so
  *      the exemption cannot outlive the absence that justified it.
  *
- * WHAT CHECK 5 DOES AND DOES NOT PROVE
- * ------------------------------------
- * It proves the refusal instruction is present, identically, in every command:
- * that a command cannot have quietly lost the sentence telling the agent to
- * stop and ask rather than guess an issue or fall back to writing a local file.
- * It proves nothing about whether a model obeys it. Obedience is a behavioural
- * property and it is measured by the trigger evals in `evals/`, not by reading
- * bytes off disk. Both are needed; neither substitutes for the other. Stating
- * that plainly matters, because "a check asserts none of the six can complete
- * without an identifier" is easy to read as a guarantee about runtime, and this
- * check is a guarantee about text.
+ * WHAT CHECKS 5 AND 6 DO AND DO NOT PROVE
+ * ---------------------------------------
+ * They prove two instructions are present, identically, where they belong: that
+ * no command has quietly lost the sentence telling the agent to stop and ask
+ * rather than guess an issue or write a local file, and that the build command
+ * has not quietly gone back to reading its mode from the whole argument.
+ *
+ * They prove nothing about whether a model obeys either one. Obedience is a
+ * behavioural property, measured by the evals in `evals/`, not by reading bytes
+ * off disk. Both are needed; neither substitutes for the other. Saying so
+ * plainly matters, because "a check asserts none of the six can complete
+ * without an identifier" reads as a guarantee about runtime, and this is a
+ * guarantee about text.
  *
  * Usage:   node scripts/check-commands.js
  * Exit codes: 0 = all clear, 1 = one or more errors
@@ -80,14 +89,13 @@ const MAX_MIGRATED_BYTES = 4000;
 // a dead reference, and either way the agent following that command finds
 // nothing.
 //
-// This map is self-retiring, and that is the point of check 6's second
+// This map is self-retiring, and that is the point of check 8's second
 // direction: when one of these skills lands, the check goes red asking for the
 // entry to be deleted. An exemption that can only be removed by a human who
 // happens to remember it is an exemption that becomes permanent.
 const PLANNED_SKILLS = new Map([
   ['flowly-define',    'the Define phase skill, authored in the Flowly-native skills phase'],
   ['flowly-plan-gate', 'the plan-gate skill, authored in the Flowly-native skills phase'],
-  ['flowly-build',     'the Build phase skill, authored by the autonomous-build task later in this phase'],
   ['flowly-verify',    'the Verify phase skill, authored in the Flowly-native skills phase'],
   ['flowly-review',    'the Review phase skill, authored in the Flowly-native skills phase'],
   ['flowly-ship',      'the Ship phase skill, authored in the Flowly-native skills phase'],
@@ -126,6 +134,50 @@ const CANONICAL_BLOCK = [
   'to a local file — every artifact belongs to the issue, and a local file is the exact failure this',
   'distribution exists to prevent.',
 ].join('\n');
+
+// ─── The canonical mode block (build only) ───────────────────────────────────
+//
+// Owned here for the same reason as the block above, but guarding a different
+// mistake. Upstream's build command tested its *whole* argument against the
+// mode words, which works only while the argument is nothing but a mode word.
+// Give this command what it is for — a mode and an issue in one argument — and
+// the whole-string test fails to match, and the command silently selects
+// single-task mode on the one invocation that explicitly asked for the
+// opposite. Silently: there is no error, the run just quietly does a sixth of
+// the work.
+//
+// So the contract is that the two are read out independently and in any order,
+// and it is asserted rather than described, because the failure it prevents
+// looks exactly like success.
+const CANONICAL_MODE_BLOCK = [
+  '## Select the mode',
+  '',
+  'The arguments carry two independent things and they may arrive in either order: the identifier you',
+  'just resolved, and optionally a mode word. Read each out of the argument text separately. Do not',
+  'test the whole argument against the mode words — `auto FLO-1234` is both, and matching the whole',
+  'string selects single-task mode on the very invocation that asked for the opposite.',
+  '',
+  '- **`auto`, or `all`** — autonomous: work every remaining child to done without stopping between',
+  '  them.',
+  '- **anything else, or nothing** — the default: work the next child, then stop.',
+].join('\n');
+
+// The command this block belongs to. Only one command has a mode.
+const MODE_COMMAND = 'build';
+
+// ─── Forbidden planning destinations ─────────────────────────────────────────
+//
+// The paths upstream's autonomous mode listed as *expected* uncommitted changes
+// — the whitelist that told the agent a working tree containing `tasks/plan.md`
+// was a clean baseline. Every one of them is a planning artifact that belongs
+// to a Flowly issue here, so there is nothing legitimate to whitelist and the
+// whitelist itself had to go.
+//
+// Scoped to `commands/` deliberately: the tree-wide version of this rule is the
+// binding check, which arrives with the task that rebinds the inherited corpus.
+// This is the narrow version, held early, because the command layer is where
+// those paths were *enforced* rather than merely suggested.
+const FORBIDDEN_DESTINATIONS = ['SPEC.md', 'spec/', 'tasks/plan.md', 'tasks/todo.md'];
 
 // ─── Reading a command file ──────────────────────────────────────────────────
 
@@ -453,6 +505,61 @@ function checkCanonicalBlock(files, report) {
   return errors.length;
 }
 
+function checkModeBlock(files, report) {
+  const errors = [];
+  const target = files.find(f => f.stem === MODE_COMMAND);
+
+  if (target === undefined) {
+    // Check 1 has already reported the missing file; do not report it twice.
+    report([], 'the autonomous-mode contract', `skipped — commands/${MODE_COMMAND}.md is absent`);
+    return 0;
+  }
+  if (!target.parsed.ok) {
+    report([], 'the autonomous-mode contract', 'skipped — the frontmatter check reported this file');
+    return 0;
+  }
+
+  if (!target.parsed.body.includes(CANONICAL_MODE_BLOCK)) {
+    errors.push(`${target.rel}: does not contain the canonical \`## Select the mode\` block verbatim`);
+    errors.push('  ↳ the block is owned by CANONICAL_MODE_BLOCK in this script. Copy it back byte for byte.');
+    errors.push('  ↳ what it guards: reading the mode by testing the whole argument makes `auto FLO-1234` select single-task mode, with no error and no sign that it happened.');
+  }
+
+  // Only this command may carry a mode. A second one would mean two argument
+  // grammars for one distribution, and the second is the one nobody checks.
+  for (const { rel, stem, parsed } of files) {
+    if (stem === MODE_COMMAND || !parsed.ok) continue;
+    if (parsed.body.includes('## Select the mode')) {
+      errors.push(`${rel}: carries a \`## Select the mode\` section, but only commands/${MODE_COMMAND}.md has a mode`);
+    }
+  }
+
+  report(errors, 'the autonomous-mode contract', `commands/${MODE_COMMAND}.md reads the mode word and the identifier independently`);
+  return errors.length;
+}
+
+function checkForbiddenDestinations(files, report) {
+  const errors = [];
+
+  for (const { rel, parsed } of files) {
+    if (!parsed.ok) continue;
+    const lines = parsed.body.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      for (const dest of FORBIDDEN_DESTINATIONS) {
+        if (lines[i].includes(dest)) {
+          errors.push(`${rel}:${parsed.bodyStartLine + i}: names the planning destination \`${dest}\``);
+        }
+      }
+    }
+  }
+  if (errors.length > 0) {
+    errors.push('  ↳ a planning artifact belongs to a Flowly issue. Naming one of these paths — even to whitelist it as an expected uncommitted change — is how the local file came back.');
+  }
+
+  report(errors, 'no local planning destination', `${files.length} command(s) name none of: ${FORBIDDEN_DESTINATIONS.join(', ')}`);
+  return errors.length;
+}
+
 function checkSkillReferences(files, report) {
   const errors  = [];
   const onDisk  = skillsOnDisk();
@@ -543,6 +650,8 @@ function main() {
   errorCount += checkNoTokens(files, report);
   errorCount += checkRenderedSize(files, report);
   errorCount += checkCanonicalBlock(files, report);
+  errorCount += checkModeBlock(files, report);
+  errorCount += checkForbiddenDestinations(files, report);
   errorCount += checkSkillReferences(files, report);
 
   const status = errorCount > 0 ? 'FAILED' : 'PASSED';
