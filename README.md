@@ -75,9 +75,11 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 26 Skills
+## All 33 Skills
 
-The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-skills` meta-skill. Two of them, `flowly-plan` and `flowly-build`, are ours; the rest are inherited. The Flowly-native set grows as the remaining phases land. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 33 skills total — 32 lifecycle skills plus the `using-agent-skills` meta-skill. Nine of them are ours, the `flowly-` prefixed set; the other 24 are inherited. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+
+The Flowly set covers each of the six phases, plus two that sit under all of them: `flowly-connect`, because every other one assumes the door is open, and `flowly-loop-runs`, because a run spans the plan and build phases rather than sitting in either.
 
 ### Meta - Discover which skill applies
 
@@ -85,10 +87,20 @@ The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-
 |-------|-------------|----------|
 | [using-agent-skills](skills/using-agent-skills/SKILL.md) | Maps incoming work to the right skill workflow and defines shared operating rules | Starting a session or deciding which skill applies |
 
+### Flowly - Reach the tracker and drive a run
+
+Neither of these is a lifecycle phase. The first is the precondition for every Flowly skill below; the second spans the plan and build phases rather than belonging to either.
+
+| Skill | What It Does | Use When |
+|-------|-------------|----------|
+| [flowly-connect](skills/flowly-connect/SKILL.md) | Reach an instance over its MCP door, prove it with an identity call, and tell the ways in apart from the ways a call is turned away | Flowly's tools are missing from a session, or a Flowly call is refused |
+| [flowly-loop-runs](skills/flowly-loop-runs/SKILL.md) | Drive a loop run through its three gates — pick an autonomy level the agent can actually move, and stop where a human's verdict is required | Creating a loop or starting a run, or a run will not start or will not leave its plan phase |
+
 ### Define - Clarify what to build
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-define](skills/flowly-define/SKILL.md) | Open work on an issue — find it or file it, accept or decline what sits in triage, read the project's assets, and record the research doc | A request has no Flowly issue behind it yet, or nothing has been investigated against one |
 | [interview-me](skills/interview-me/SKILL.md) | One-question-at-a-time interview that extracts what the user actually wants instead of what they think they should want, until ~95% confidence | The ask is underspecified, or the user invokes "interview me" / "grill me" |
 | [idea-refine](skills/idea-refine/SKILL.md) | Structured divergent/convergent thinking to turn vague ideas into concrete proposals | You have a rough concept that needs exploration |
 | [spec-driven-development](skills/spec-driven-development/SKILL.md) | Write a PRD covering objectives, commands, structure, code style, testing, and boundaries before any code | Starting a new project, feature, or significant change |
@@ -98,6 +110,7 @@ The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
 | [flowly-plan](skills/flowly-plan/SKILL.md) | Write an issue's four planning docs and its task list through Flowly's tools, then hand the plan to the human gate | You have a Flowly issue identifier and work under it that needs breaking down |
+| [flowly-plan-gate](skills/flowly-plan-gate/SKILL.md) | Carry an issue across its plan gate — submit, watch the notification inbox for the verdict, and convert the todo doc into child issues exactly once | The docs are written and a human must now decide, or a verdict has landed |
 | [planning-and-task-breakdown](skills/planning-and-task-breakdown/SKILL.md) | Decompose specs into small, verifiable tasks with acceptance criteria and dependency ordering | You have a spec and need implementable units |
 
 ### Build - Write the code
@@ -117,6 +130,7 @@ The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-verify](skills/flowly-verify/SKILL.md) | Attach a loop run's evidence packet as few substantial items — the packet caps at item count, not size, and reports its own truncation | A child issue's work is committed and its verification has been run |
 | [browser-testing-with-devtools](skills/browser-testing-with-devtools/SKILL.md) | Chrome DevTools MCP for live runtime data - DOM inspection, console logs, network traces, performance profiling | Building or debugging anything that runs in a browser |
 | [debugging-and-error-recovery](skills/debugging-and-error-recovery/SKILL.md) | Five-step triage: reproduce, localize, reduce, fix, guard. Stop-the-line rule, safe fallbacks | Tests fail, builds break, or behavior is unexpected |
 
@@ -124,6 +138,7 @@ The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-review](skills/flowly-review/SKILL.md) | Hand a loop run to its human gate at `awaiting_review` and pick the work back up once a person has ruled — the verdict lives on the run, not the issue | A loop run has built something and a human has to rule on it |
 | [code-review-and-quality](skills/code-review-and-quality/SKILL.md) | Five-axis review, change sizing (~100 lines), severity labels (Nit/Optional/FYI), review speed norms, splitting strategies | Before merging any change |
 | [code-simplification](skills/code-simplification/SKILL.md) | Chesterton's Fence, Rule of 500, reduce complexity while preserving exact behavior | Code works but is harder to read or maintain than it should be |
 | [security-and-hardening](skills/security-and-hardening/SKILL.md) | OWASP Top 10 prevention, auth patterns, secrets management, dependency auditing, three-tier boundary system | Handling user input, auth, data storage, or external integrations |
@@ -133,6 +148,7 @@ The pack includes 26 skills total — 25 lifecycle skills plus the `using-agent-
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-ship](skills/flowly-ship/SKILL.md) | Record what a set of finished issues amounts to, as a dated release bundle — which ships nothing by itself | Finished work has to be grouped into a Flowly release |
 | [git-workflow-and-versioning](skills/git-workflow-and-versioning/SKILL.md) | Trunk-based development, atomic commits, change sizing (~100 lines), the commit-as-save-point pattern | Making any code change (always) |
 | [ci-cd-and-automation](skills/ci-cd-and-automation/SKILL.md) | Shift Left, Faster is Safer, feature flags, quality gate pipelines, failure feedback loops | Setting up or modifying build and deploy pipelines |
 | [deprecation-and-migration](skills/deprecation-and-migration/SKILL.md) | Code-as-liability mindset, compulsory vs advisory deprecation, migration patterns, zombie code removal | Removing old systems, migrating users, or sunsetting features |
@@ -209,7 +225,7 @@ Every skill follows a consistent anatomy:
 
 ```
 flowly-agent-skills/
-├── skills/                            # 26 skills (25 lifecycle + 1 meta)
+├── skills/                            # 33 skills (32 lifecycle + 1 meta)
 ├── agents/                            # 4 specialist personas
 ├── references/                        # 7 supplementary checklists
 ├── commands/                          # the 6 lifecycle commands, each taking an issue identifier
