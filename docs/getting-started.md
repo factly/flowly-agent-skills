@@ -13,7 +13,7 @@ Each skill is a Markdown file (`SKILL.md`) that describes a specific engineering
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/addyosmani/agent-skills.git
+git clone https://github.com/factly/flowly-agent-skills.git
 ```
 
 ### 2. Choose a skill
@@ -118,12 +118,6 @@ The `.claude/commands/` directory contains slash commands for Claude Code:
 | `/ship` | shipping-and-launch |
 | `/webperf` | web-performance-auditor (specialist agent, web apps only) |
 
-> **Note:** When installed as a Claude Code plugin you may see a warning like
-> _"Default commands/ folder is ignored because the manifest sets 'commands'"_.
-> This is expected. The root `commands/` directory belongs to the Antigravity CLI
-> and is intentionally separate from `.claude/commands/`. All Claude Code slash
-> commands load correctly from `.claude/commands/`; the warning is cosmetic.
-
 ## Using References
 
 The `references/` directory contains supplementary checklists:
@@ -140,13 +134,12 @@ The `references/` directory contains supplementary checklists:
 
 Load a reference when you need detailed patterns beyond what the skill covers.
 
-If you install one skill with `npx skills add ... --skill <name>`, only the
-selected `skills/<name>/` directory is copied. The skill still works, but paths
-to supplementary checklists in the repo-level `references/` directory are
-unavailable. Use a whole-repo integration, clone the repository, or copy the
-needed checklist into a `references/` directory inside the installed skill.
-This portability gap is tracked in
-[addyosmani/agent-skills#361](https://github.com/addyosmani/agent-skills/issues/361).
+If you copy a single skill out of `skills/<name>/`, only that directory comes
+with it. The skill still works, but paths to supplementary checklists in the
+repo-level `references/` directory are unavailable. Use a whole-repo
+integration, clone the repository, or copy the needed checklist into a
+`references/` directory inside the installed skill. See
+[skill-anatomy.md](skill-anatomy.md#shared-references) for the tradeoff.
 
 ## Spec and task artifacts
 

@@ -1,12 +1,13 @@
 {
-  "name": "agent-skills",
-  "description": "Production-grade engineering skills for AI coding agents — covering the full software development lifecycle from spec to ship.",
+  "name": "flowly",
+  "version": "0.1.0",
+  "description": "Production-grade engineering skills for AI coding agents — covering the full software development lifecycle from define to ship.",
   "author": {
-    "name": "Addy Osmani"
+    "name": "Factly Media & Research",
+    "url": "https://github.com/factly"
   },
-  "homepage": "https://github.com/addyosmani/agent-skills",
-  "repository": "https://github.com/addyosmani/agent-skills",
+  "homepage": "https://github.com/factly/flowly-agent-skills",
+  "repository": "https://github.com/factly/flowly-agent-skills",
   "license": "MIT",
-  "commands": ["./.claude/commands", "./commands"],
   "skills": "./skills"
 }

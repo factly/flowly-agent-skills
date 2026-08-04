@@ -1,8 +1,10 @@
-# agent-skills
+# flowly-agent-skills
 
-This is the agent-skills project — a collection of production-grade engineering skills for AI coding agents.
+This is the flowly-agent-skills project — a collection of production-grade engineering skills for AI coding agents.
 
-> **Scope:** This file configures agents working on the [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) repository itself, not other projects. Don't copy it into another project or a global agent configuration; the reusable assets are the skills in `skills/`.
+> **Scope:** This file configures agents working on the [`factly/flowly-agent-skills`](https://github.com/factly/flowly-agent-skills) repository itself, not other projects. Don't copy it into another project or a global agent configuration; the reusable assets are the skills in `skills/`.
+>
+> This repository is a fork. Pull requests belong to `factly/flowly-agent-skills`, not to the project it was forked from; see [NOTICE.md](NOTICE.md) for the attribution and the upstream base.
 
 ## Project Structure
 
@@ -11,10 +13,14 @@ skills/       → Core skills (SKILL.md per directory)
 agents/       → Reusable agent personas (code-reviewer, test-engineer, security-auditor, web-performance-auditor)
 hooks/        → Session lifecycle hooks
 .claude/commands/ → Slash commands (/spec, /plan, /build, /test, /review, /code-simplify, /ship; plus /webperf specialist audit)
+.claude/rules/ → Repo-scoped rules for agents working here
 references/   → Supplementary checklists (testing, performance, security, accessibility, observability)
+scripts/      → Validators and the eval harness (plain Node, no build step)
 evals/        → Skill eval cases + framework (see evals/README.md)
-docs/         → Setup guides for different tools
+docs/         → Repo and setup guides
 ```
+
+Claude Code is the only door this fork ships and tests. Slash commands read `/flowly:<command>` and skills read `flowly:<skill>` once the plugin is installed.
 
 ## Skills by Phase
 
@@ -46,15 +52,15 @@ Before adding a new skill or significantly reworking an existing one, run the pr
 
 ## Pull Requests
 
-PRs target the upstream repository's default branch. In a typical fork setup the upstream remote is `upstream` and your fork is `origin`, but the exact remote names are not what matters here.
+PRs target this repository's default branch — `factly/flowly-agent-skills`, never the project it was forked from. Bugs found here are ours; do not report them upstream.
 
-- Before opening a PR, search the upstream repository's open PRs and issues for work that touches the same files or rules. If any overlaps, coordinate (build on it, align your rules with it, or rebase after it merges) instead of opening a conflicting PR.
+- Before opening a PR, search this repository's open PRs and issues for work that touches the same files or rules. If any overlaps, coordinate (build on it, align your rules with it, or rebase after it merges) instead of opening a conflicting PR.
 - Prefer small, focused PRs over large refactors of widely shared files (for example, files under `scripts/`), which are more likely to collide with in-flight work.
 
 ## Boundaries
 
 - Always: Run the CONTRIBUTING.md pre-flight checks before creating a new skill directory
 - Always: Follow the skill-anatomy.md format for new skills
-- Always: Check the upstream repo's open PRs and issues for overlap before opening a new PR
+- Always: Check this repo's open PRs and issues for overlap before opening a new PR
 - Never: Add skills that are vague advice instead of actionable processes
 - Never: Duplicate content between skills — reference other skills instead

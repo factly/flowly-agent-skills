@@ -48,6 +48,26 @@ to rot, because each one is a manifest or a command set that would have to be ke
 openable by two authoring rules that cost nothing: no substitution token in any command body, and
 skill frontmatter limited to `name` and `description`.
 
+`plugin.json` at the repository root was Antigravity's plugin manifest — the counterpart to the
+marketplace manifest above — and was removed with it.
+
+## Surviving references to upstream
+
+Upstream's *identity* is stripped: no hero image, no badge, no maintainer table, no install line
+pointing at upstream's repo, and no manifest naming upstream as author or owner. What remains is
+this file, `LICENSE`, and three links to upstream's **issue tracker**. Those are not identity
+artifacts and are deliberately kept:
+
+| Where | What | Why it stays |
+|---|---|---|
+| `scripts/lib/skill-lint.js` | Upstream issue link inside a lint exemption's rationale | The linter is inherited **unmodified** on purpose — it is validated on every merge, and an edit here is a cost paid forever. It is also registered as byte-identical to the base. |
+| `docs/skill-anatomy.md` | Upstream issue #361 — a per-skill install leaves the repo-root `references/` behind | The limitation is upstream's and the issue is upstream's. Repointing it at our tracker would claim work we are not doing. |
+| `evals/README.md` | Upstream issue #351 — description-vocabulary gaps the evals surface | Same: an upstream finding about upstream's own eval corpus. |
+
+A grep for the upstream owner therefore returns hits in `LICENSE`, in this file, and in exactly those
+three places. Anything beyond them is a regression — most likely a merge reintroducing an install
+line or an author field — and should be removed rather than added to this table.
+
 ## Ownership register
 
 Every file this fork ships from upstream's content trees is listed below with a status that says what

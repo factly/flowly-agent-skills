@@ -15,7 +15,7 @@ What neither provides is a **deterministic, CI-safe** check for a multi-skill *c
 
 | Tier | What it checks | Runs | Cost |
 |---|---|---|---|
-| 1. Structural | Frontmatter, naming, required sections, command parity | CI (`validate-skills.js`, `validate-commands.js`) | Free |
+| 1. Structural | Frontmatter, naming, required sections | CI (`validate-skills.js`) | Free |
 | 2. Trigger & routing | Positive prompts rank their skill top-k; negative prompts don't; no two descriptions near-collide | CI (`run-evals.js`) | Free |
 | 3. Behavioral | An agent following the skill satisfies its `expectations[]` | On demand (`run-evals.js --behavioral`) | Tokens |
 
@@ -82,4 +82,4 @@ Every skill ships with an eval file. When you add `skills/<name>/`, add `evals/c
 
 ## Metrics to watch
 
-The Tier-2 run prints a **trigger rank-1 rate** (share of positive prompts that rank their skill first, not merely top-k). CI runs with `--min-rank1 80`, leaving useful headroom below the checked-in 86% baseline so an unrelated description edit does not immediately turn CI red. Raise the floor as routing improves; never lower it to make a regression pass. Falling numbers mean descriptions are drifting toward each other. The collision check errors at ≥75% pairwise description similarity and warns at ≥50%. Known description-vocabulary gaps surfaced by these evals are tracked in [#351](https://github.com/addyosmani/agent-skills/issues/351).
+The Tier-2 run prints a **trigger rank-1 rate** (share of positive prompts that rank their skill first, not merely top-k). CI runs with `--min-rank1 80`, leaving useful headroom below the checked-in 86% baseline so an unrelated description edit does not immediately turn CI red. Raise the floor as routing improves; never lower it to make a regression pass. Falling numbers mean descriptions are drifting toward each other. The collision check errors at ≥75% pairwise description similarity and warns at ≥50%. Known description-vocabulary gaps surfaced by these evals are inherited from upstream, where they are tracked as [upstream issue #351](https://github.com/addyosmani/agent-skills/issues/351).

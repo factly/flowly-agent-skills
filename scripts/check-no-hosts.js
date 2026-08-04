@@ -90,8 +90,6 @@ const ALLOWED_HOSTS = new Set([
   'developer.chrome.com',
   'code.visualstudio.com',
   'docs.cursor.com',
-  'kiro.dev',
-  'developers.openai.com',
   'modelcontextprotocol.io',
   'json.schemastore.org',
   'docs.npmjs.com',
@@ -99,9 +97,6 @@ const ALLOWED_HOSTS = new Set([
   'yarnpkg.com',
   'abseil.io',
   'genai.owasp.org',
-  'www.linkedin.com',
-  'trendshift.io',
-  'addyosmani.com',          // upstream author's site, cited in inherited content
   'claude.ai',
   'developer.mozilla.org',
   'docs.djangoproject.com',

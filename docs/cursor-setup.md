@@ -49,7 +49,7 @@ your-project/
 ```
 
 **Source of truth for the agent:** `.cursor/skills/`.  
-Treat `agent-skills/skills/` (or a cloned [addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)) as **upstream** — sync into `.cursor/skills/`, do not edit only upstream and expect Cursor to see it.
+Treat `agent-skills/skills/` (or a cloned [factly/flowly-agent-skills](https://github.com/factly/flowly-agent-skills)) as **upstream** — sync into `.cursor/skills/`, do not edit only upstream and expect Cursor to see it.
 
 ---
 
@@ -222,4 +222,4 @@ Files under `agent-skills/agents/` (e.g. code reviewer persona) are **not** load
 
 - [getting-started.md](getting-started.md)
 - [../README.md](../README.md) — Cursor quick blurb
-- Upstream: [github.com/addyosmani/agent-skills](https://github.com/addyosmani/agent-skills)
+- Source repository: [github.com/factly/flowly-agent-skills](https://github.com/factly/flowly-agent-skills)

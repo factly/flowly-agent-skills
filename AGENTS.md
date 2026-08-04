@@ -1,16 +1,18 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, Antigravity, etc.) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, Cursor, Copilot, etc.) when working with code in this repository.
 
-> **Scope:** This file configures agents working on the [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) repository itself. It is not meant to be copied into other projects or into a global agent configuration; the reusable assets are the skills in `skills/`, not this file.
+> **Scope:** This file configures agents working on the [`factly/flowly-agent-skills`](https://github.com/factly/flowly-agent-skills) repository itself. It is not meant to be copied into other projects or into a global agent configuration; the reusable assets are the skills in `skills/`, not this file.
+>
+> This repository is a fork. Pull requests belong to `factly/flowly-agent-skills`, not to the project it was forked from; see [NOTICE.md](NOTICE.md) for the attribution and the upstream base.
 
 ## Repository Overview
 
 A collection of skills for Claude.ai and Claude Code for senior software engineers. Skills are packaged instructions and scripts that extend Claude and your coding agents capabilities.
 
-## OpenCode Integration
+## Skill-Driven Execution
 
-OpenCode uses a **skill-driven execution model** powered by the `skill` tool and this repository's `/skills` directory.
+Agents working here follow a **skill-driven execution model** powered by this repository's `skills/` directory.
 
 ### Core Rules
 
@@ -33,9 +35,9 @@ The agent should automatically map user intent to skills:
 
 ### Lifecycle Mapping (Implicit Commands)
 
-OpenCode does not support slash commands like `/spec` or `/plan`.
+Not every agent supports slash commands like `/spec` or `/plan`.
 
-Instead, the agent must internally follow this lifecycle:
+Where they are unavailable, the agent must internally follow this lifecycle:
 
 - DEFINE → `spec-driven-development`
 - PLAN → `planning-and-task-breakdown`
@@ -65,7 +67,7 @@ Correct behavior:
 
 - Always check for and use skills first
 
-This ensures OpenCode behaves similarly to Claude Code with full workflow enforcement.
+This keeps workflow enforcement consistent across agents.
 
 ## Orchestration: Personas, Skills, and Commands
 

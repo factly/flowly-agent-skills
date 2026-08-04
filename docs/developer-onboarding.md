@@ -1,6 +1,6 @@
 # Developer Onboarding
 
-This guide is for people working **on** the agent-skills repository itself: contributing skills, fixing docs, improving the eval harness. If you want to *use* the skills in your own projects, you're looking for [getting-started.md](getting-started.md) instead.
+This guide is for people working **on** the flowly-agent-skills repository itself: contributing skills, fixing docs, improving the eval harness. If you want to *use* the skills in your own projects, you're looking for [getting-started.md](getting-started.md) instead.
 
 It's a guided tour, not a rulebook. The rules live in [CONTRIBUTING.md](../CONTRIBUTING.md) (contribution workflow), [skill-anatomy.md](skill-anatomy.md) (skill format), and [evals/README.md](../evals/README.md) (eval framework); this document tells you when to read each one and how the pieces fit.
 
@@ -14,7 +14,7 @@ The repo has five composable layers. Understanding what each one is *for* preven
 |---|---|---|---|
 | **Skills** | `skills/<name>/SKILL.md` | Step-by-step workflows with verification gates | *How* |
 | **Personas** | `agents/<role>.md` | Roles with a perspective and output format | *Who* |
-| **Commands** | `.claude/commands/`, `.gemini/commands/`, `commands/` | User-facing entry points; the orchestration layer | *When* |
+| **Commands** | `.claude/commands/` | User-facing entry points; the orchestration layer | *When* |
 | **References** | `references/*.md` | Checklists skills pull in on demand | *What to check* |
 | **Evals** | `evals/cases/<name>.json` | Proof that skills trigger and behave correctly | *Does it work* |
 
@@ -25,13 +25,13 @@ Two structural rules worth internalizing early:
 
 One scope caveat that trips people up: `AGENTS.md` and `CLAUDE.md` at the repo root configure agents working on *this repo*. They are not reusable assets and setup guides must never tell users to copy them into their own projects; the reusable assets are the skills.
 
-Note that commands exist in three parallel directories (Claude Code, Gemini CLI, Antigravity). Touch one and CI checks parity across all of them, see §3.
+Claude Code is the only door this fork ships and tests, so commands live in one directory only.
 
 ## 2. Local setup
 
 ```bash
-git clone https://github.com/addyosmani/agent-skills.git
-cd agent-skills
+git clone https://github.com/factly/flowly-agent-skills.git
+cd flowly-agent-skills
 ```
 
 There's no build step and no `package.json`; validators are plain Node scripts. You need:
@@ -44,7 +44,7 @@ There's no build step and no `package.json`; validators are plain Node scripts. 
 To try the pack live against a local checkout:
 
 ```bash
-claude --plugin-dir /path/to/agent-skills
+claude --plugin-dir /path/to/flowly-agent-skills
 ```
 
 ## 3. The verification loop
@@ -54,9 +54,6 @@ The repo eats its own cooking: verification is non-negotiable for skills, and it
 ```bash
 # Tier 1, structural: frontmatter, naming, required sections
 node scripts/validate-skills.js
-
-# Command parity and description sync across the three command directories
-node scripts/validate-commands.js
 
 # Tier 2, trigger & routing: positive prompts rank top-k, negatives don't collide
 node scripts/run-evals.js
@@ -71,7 +68,7 @@ bash hooks/session-start-test.sh
 
 The three eval tiers are worth understanding even if you never touch the harness, because a red Tier 2 usually means *fix your skill's description*, not the eval: Tier 2 is a lexical approximation of routing (stemmed TF-IDF over descriptions), and its two target failure modes are a description missing the vocabulary users actually say, and an over-broad description that outranks the right skill. The full design, schema, and trust-level rules are in [evals/README.md](../evals/README.md).
 
-Run the relevant subset before every PR. A PR that arrives green through Tier 1 + Tier 2 + command parity is reviewable; one that doesn't will bounce on mechanics before anyone reads the content.
+Run the relevant subset before every PR. A PR that arrives green through Tier 1 + Tier 2 is reviewable; one that doesn't will bounce on mechanics before anyone reads the content.
 
 ## 4. Contribution paths
 
@@ -99,7 +96,6 @@ One point worth internalizing rather than looking up: when writing trigger promp
 
 - [ ] Tier 1 green: `node scripts/validate-skills.js`
 - [ ] Tier 2 green: `node scripts/run-evals.js`
-- [ ] Command parity green if you touched any command directory: `node scripts/validate-commands.js`
 - [ ] Hook test green if you touched `hooks/` or `using-agent-skills`
 - [ ] New skill → eval case file present with the minimum trigger/behavioral counts
 - [ ] New skill → gap justified in the PR description; catalog and open PRs checked

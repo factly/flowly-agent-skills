@@ -1,12 +1,8 @@
-# Agent Skills
+# Flowly Agent Skills
 
-**Production-grade engineering skills for AI coding agents.**
+**Production-grade engineering skills for AI coding agents, packaged for teams that run their software lifecycle in [Flowly](https://github.com/factly/flowly).**
 
 Skills encode the workflows, quality gates, and best practices that senior engineers use when building software. These ones are packaged so AI agents follow them consistently across every phase of development.
-
-<a href="https://trendshift.io/repositories/25200" target="_blank"><img src="https://trendshift.io/api/badge/repositories/25200" alt="addyosmani%2Fagent-skills | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-![Addy's Agent Skills](https://addyosmani.com/assets/images/addys-agent-skills.jpg)
 
 ```
   DEFINE          PLAN           BUILD          VERIFY         REVIEW          SHIP
@@ -14,75 +10,44 @@ Skills encode the workflows, quality gates, and best practices that senior engin
  │ Idea │ ───▶ │ Spec │ ───▶ │ Code │ ───▶ │ Test │ ───▶ │  QA  │ ───▶ │  Go  │
  │Refine│      │  PRD │      │ Impl │      │Debug │      │ Gate │      │ Live │
  └──────┘      └──────┘      └──────┘      └──────┘      └──────┘      └──────┘
-  /spec          /plan          /build        /test         /review       /ship
 ```
+
+Skills activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
 
 ---
 
-## Commands
+## Status
 
-8 slash commands that map to the development lifecycle. Each one activates the right skills automatically.
+This distribution is **under construction and not yet announced**. What is here today is the
+inherited corpus — 24 skills, 4 agent personas, 7 reference checklists — plus the structural gates
+that everything authored afterwards has to pass.
 
-| What you're doing | Command | Key principle |
-|-------------------|---------|---------------|
-| Define what to build | `/spec` | Spec before code |
-| Plan how to build it | `/plan` | Small, atomic tasks |
-| Build incrementally | `/build` | One slice at a time |
-| Prove it works | `/test` | Tests are proof |
-| Review before merge | `/review` | Improve code health |
-| Audit web performance | `/webperf` | Measure before you optimize |
-| Simplify the code | `/code-simplify` | Clarity over cleverness |
-| Ship to production | `/ship` | Faster is safer |
+**No slash commands ship yet.** The lifecycle commands that are the point of this fork — each taking
+a Flowly issue identifier, so that `/flowly:plan FLO-1234` writes that issue's planning docs through
+Flowly's MCP surface rather than to a local file — are authored next. Until then the plugin declares
+no command directory and installs 24 skills.
 
-Want fewer manual steps once the spec exists? **`/build auto`** generates the plan and implements every task in a single approved pass — you approve the plan once, then it runs autonomously. It removes the human stepping *between* tasks, not the verification: every task is still test-driven and committed individually, and it pauses on failures or risky steps.
-
-Skills also activate automatically based on what you're doing — designing an API triggers `api-and-interface-design`, building UI triggers `frontend-ui-engineering`, and so on.
+There is no semver contract. The manifests carry `0.1.0` because the plugin validator requires a
+version, not because anything is promised about compatibility.
 
 ---
 
-## Quick Start
+## Install
 
-**Fastest path — any agent, one command.** The open [skills CLI](https://github.com/vercel-labs/skills) installs into 70+ agents (Claude Code, Cursor, Codex, Copilot, Cline, and more):
-
-```bash
-npx skills add addyosmani/agent-skills            # install all 24 skills
-npx skills add addyosmani/agent-skills --list     # browse before installing
-```
-
-Or grab individual skills:
-
-```bash
-npx skills add addyosmani/agent-skills --skill code-review-and-quality   # five-axis review before merge
-npx skills add addyosmani/agent-skills --skill interview-me              # requirements interrogation, one question at a time
-npx skills add addyosmani/agent-skills --skill test-driven-development   # red-green-refactor, enforced
-```
-
-> **Installing one skill?** A per-skill `npx` install copies only
-> `skills/<name>/`, not the repo-level `references/` directory. The skill still
-> works, but paths to supplementary shared checklists are unavailable. Use a
-> whole-repo integration, clone the repository, or copy the needed checklist into
-> a `references/` directory inside the installed skill. This portability gap is
-> tracked in [#361](https://github.com/addyosmani/agent-skills/issues/361).
-
-Prefer a native integration? Pick your tool below.
-
-<details>
-<summary><b>Claude Code (recommended)</b></summary>
-
-**Marketplace install:**
+Claude Code is the shipped door.
 
 ```
-/plugin marketplace add addyosmani/agent-skills
-/plugin install agent-skills@addy-agent-skills
+/plugin marketplace add factly/flowly-agent-skills
+/plugin install flowly@flowly-agent-skills
 ```
 
 > **SSH errors?** The marketplace clones repos via SSH. If you don't have SSH keys set up on GitHub, either [add your SSH key](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/adding-a-new-ssh-key-to-your-github-account) or use the full HTTPS URL to force HTTPS cloning during the marketplace-add step:
 > ```bash
-> /plugin marketplace add https://github.com/addyosmani/agent-skills.git
-> /plugin install agent-skills@addy-agent-skills
+> /plugin marketplace add https://github.com/factly/flowly-agent-skills.git
+> /plugin install flowly@flowly-agent-skills
 > ```
 >
-> If `/plugin install` still fails with `git@github.com: Permission denied (publickey)` on Windows or macOS, the recommended workaround is to configure Git once to rewrite GitHub SSH URLs to HTTPS for subprocess clones:
+> If `/plugin install` still fails with a `Permission denied (publickey)` error on Windows or macOS, the recommended workaround is to configure Git once to rewrite GitHub SSH URLs to HTTPS for subprocess clones:
 > ```bash
 > git config --global url."https://github.com/".insteadOf git@github.com:
 > ```
@@ -90,107 +55,14 @@ Prefer a native integration? Pick your tool below.
 **Local / development:**
 
 ```bash
-git clone https://github.com/addyosmani/agent-skills.git
-claude --plugin-dir /path/to/agent-skills
+git clone https://github.com/factly/flowly-agent-skills.git
+claude --plugin-dir /path/to/flowly-agent-skills
 ```
 
-</details>
-
-<details>
-<summary><b>Cursor</b></summary>
-
-Put workflow skills under `.cursor/skills/` (sync from `agent-skills/skills/`) and short policies in `.cursor/rules/*.mdc` — do not paste full skills into rules. See [docs/cursor-setup.md](docs/cursor-setup.md).
-
-</details>
-
-<details>
-<summary><b>Antigravity CLI</b></summary>
-
-Install as a native plugin for skills, subagents, and slash commands. See [docs/antigravity-setup.md](docs/antigravity-setup.md).
-
-**Install from the repo:**
-
-```bash
-agy plugin install https://github.com/addyosmani/agent-skills.git
-```
-
-**Install from a local clone:**
-
-```bash
-git clone https://github.com/addyosmani/agent-skills.git
-agy plugin install ./agent-skills
-```
-
-</details>
-
-<details>
-<summary><b>Gemini CLI</b></summary>
-
-Install as native skills for auto-discovery, or add to `GEMINI.md` for persistent context. See [docs/gemini-cli-setup.md](docs/gemini-cli-setup.md).
-
-**Install from the repo:**
-
-```bash
-gemini skills install https://github.com/addyosmani/agent-skills.git --path skills
-```
-
-**Install from a local clone:**
-
-```bash
-gemini skills install ./agent-skills/skills/
-```
-
-</details>
-
-<details>
-<summary><b>Windsurf</b></summary>
-
-Add skill contents to your Windsurf rules configuration. See [docs/windsurf-setup.md](docs/windsurf-setup.md).
-
-</details>
-
-<details>
-<summary><b>OpenCode</b></summary>
-
-Uses agent-driven skill execution via AGENTS.md and the `skill` tool.
-
-See [docs/opencode-setup.md](docs/opencode-setup.md).
-
-</details>
-
-<details>
-<summary><b>GitHub Copilot</b></summary>
-
-Use agent definitions from `agents/` as Copilot personas and skill content in `.github/copilot-instructions.md`. See [docs/copilot-setup.md](docs/copilot-setup.md).
-
-</details>
-
-<details>
-  <summary><b>Kiro IDE & CLI </b></summary>
-  Skills for Kiro reside under ".kiro/skills/" and can be stored under Project or Global level. Kiro also supports Agents.md. See Kiro docs at https://kiro.dev/docs/skills/
-</details>
-
-<details>
-<summary><b>Codex</b></summary>
-
-Install as a native Codex plugin (Codex CLI v0.122+):
-
-```bash
-codex plugin marketplace add addyosmani/agent-skills
-```
-
-Codex reads the root `skills/` directory directly through `.codex-plugin/plugin.json`. Once installed, invoke skills in chat using `@` (e.g., `@spec-driven-development`). See [docs/codex-setup.md](docs/codex-setup.md) for local installation and troubleshooting.
-
-</details>
-
-<details>
-<summary><b>Other Agents</b></summary>
-
-Skills are plain Markdown - they work with any agent that accepts system prompts or instruction files. See [docs/getting-started.md](docs/getting-started.md).
-
-</details>
-
-
+Other doors — the `skills` CLI for a flat install, and Codex's native plugin format — are kept
+*openable* but are not shipped, not tested, and deliberately not documented here. Two authoring rules
+hold them open at no cost: skill frontmatter carries exactly `name` and `description`, and no command
+body contains a substitution token. Both are enforced by checks in `scripts/`.
 
 ---
 
@@ -202,7 +74,7 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ## All 24 Skills
 
-The commands above are entry points. The pack includes 24 skills total — 23 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 24 skills total — 23 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 ### Meta - Discover which skill applies
 
@@ -274,9 +146,9 @@ Pre-configured specialist personas for targeted reviews:
 | [code-reviewer](agents/code-reviewer.md) | Senior Staff Engineer | Five-axis code review with "would a staff engineer approve this?" standard |
 | [test-engineer](agents/test-engineer.md) | QA Specialist | Test strategy, coverage analysis, and the Prove-It pattern |
 | [security-auditor](agents/security-auditor.md) | Security Engineer | Vulnerability detection, threat modeling, OWASP assessment |
-| [web-performance-auditor](agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule; run it via `/webperf` |
+| [web-performance-auditor](agents/web-performance-auditor.md) | Web Performance Engineer | Core Web Vitals audit with Quick/Deep modes and a metric-honesty rule |
 
-See [docs/agents.md](docs/agents.md) for the decision matrix, orchestration rules, and how personas compose with skills and slash commands.
+See [docs/agents.md](docs/agents.md) for the decision matrix, orchestration rules, and how personas compose with skills.
 
 ---
 
@@ -308,7 +180,7 @@ Every skill follows a consistent anatomy:
 │  │ name: lowercase-hyphen-name               │  │
 │  │ description: Guides agents through [task].│  │
 │  │              Use when…                    │  │
-│  └───────────────────────────────────────────┘  │                                                                                                
+│  └───────────────────────────────────────────┘  │
 │  Overview         → What this skill does        │
 │  When to Use      → Triggering conditions       │
 │  Process          → Step-by-step workflow       │
@@ -324,63 +196,60 @@ Every skill follows a consistent anatomy:
 - **Anti-rationalization.** Every skill includes a table of common excuses agents use to skip steps (e.g., "I'll add tests later") with documented counter-arguments.
 - **Verification is non-negotiable.** Every skill ends with evidence requirements - tests passing, build output, runtime data. "Seems right" is never sufficient.
 - **Progressive disclosure.** The `SKILL.md` is the entry point. Supporting references load only when needed, keeping token usage minimal.
+- **Frontmatter is two fields.** `name` and `description`, nothing else — the intersection that loads on every door. Enforced by `scripts/validate-standard.sh`.
 
 ---
 
 ## Project Structure
 
 ```
-agent-skills/
+flowly-agent-skills/
 ├── skills/                            # 24 skills (23 lifecycle + 1 meta)
-│   ├── interview-me/                  #   Define
-│   ├── idea-refine/                   #   Define
-│   ├── spec-driven-development/       #   Define
-│   ├── planning-and-task-breakdown/   #   Plan
-│   ├── incremental-implementation/    #   Build
-│   ├── context-engineering/           #   Build
-│   ├── source-driven-development/     #   Build
-│   ├── doubt-driven-development/      #   Build
-│   ├── frontend-ui-engineering/       #   Build
-│   ├── test-driven-development/       #   Build
-│   ├── api-and-interface-design/      #   Build
-│   ├── browser-testing-with-devtools/ #   Verify
-│   ├── debugging-and-error-recovery/  #   Verify
-│   ├── code-review-and-quality/       #   Review
-│   ├── code-simplification/           #   Review
-│   ├── security-and-hardening/        #   Review
-│   ├── performance-optimization/      #   Review
-│   ├── git-workflow-and-versioning/   #   Ship
-│   ├── ci-cd-and-automation/          #   Ship
-│   ├── deprecation-and-migration/     #   Ship
-│   ├── documentation-and-adrs/        #   Ship
-│   ├── observability-and-instrumentation/ # Ship
-│   ├── shipping-and-launch/           #   Ship
-│   └── using-agent-skills/            #   Meta: how to use this pack
 ├── agents/                            # 4 specialist personas
 ├── references/                        # 7 supplementary checklists
-├── hooks/                             # Session lifecycle hooks
-├── .claude/commands/                  # 8 slash commands (Claude Code)
-├── .gemini/commands/                  # 8 slash commands (Gemini CLI)
-├── commands/                          # 8 slash commands (Antigravity CLI)
-├── plugin.json                        # Antigravity plugin manifest
-└── docs/                              # Setup guides per tool
+├── commands/                          # reserved: this fork's lifecycle commands
+├── hooks/                             # session lifecycle hooks
+├── evals/                             # skill eval cases + framework
+├── scripts/                           # the structural gates (see below)
+├── docs/                              # format spec, adoption, onboarding
+├── .claude-plugin/                    # marketplace.json + plugin.json
+├── .codex-plugin/                     # Codex manifest — door kept openable, undocumented
+├── .claude/commands/                  # inherited commands, no longer declared by the plugin
+├── LICENSE                            # MIT — upstream's copyright and ours
+└── NOTICE.md                          # derivation, base SHA, and the ownership register
 ```
+
+The plugin manifest declares `skills` and deliberately declares **no** command directory: declaring
+`commands` *replaces* Claude Code's default scan rather than adding to it, so authoring at the
+default path and staying silent is what keeps both working.
 
 ---
 
-## Why Agent Skills?
+## Checks
 
-AI coding agents default to the shortest path - which often means skipping specs, tests, security reviews, and the practices that make software reliable. Agent Skills gives agents structured workflows that enforce the same discipline senior engineers bring to production code.
+Four gates run over this repository. Each one has a mutation that turns it red, which is the only
+reason to believe it works:
+
+| Check | Asserts | Turns red when |
+|---|---|---|
+| `node scripts/validate-skills.js` | Frontmatter, description trigger and length, required sections, `name` matches the directory | A required section is deleted |
+| `./scripts/validate-standard.sh` | Frontmatter carries exactly `name` and `description` | Any third key is added |
+| `node scripts/check-no-hosts.js` | No hostname outside a curated allowlist, and no absolute workspace path, anywhere in the tree | Any new hostname appears |
+| `node scripts/check-register.js` | Every shipped file is registered exactly once, the base SHA is an ancestor of `HEAD`, and every `unchanged` file really is byte-identical to it | A file is added without a register row |
+
+`check-no-hosts.js` is the one that matters most. This repository is public, making a repository
+public later does not scrub its history, and GitHub's push protection matches credential patterns —
+a hostname matches none of them.
+
+---
+
+## Why skills?
+
+AI coding agents default to the shortest path - which often means skipping specs, tests, security reviews, and the practices that make software reliable. These skills give agents structured workflows that enforce the same discipline senior engineers bring to production code.
 
 Each skill encodes hard-won engineering judgment: *when* to write a spec, *what* to test, *how* to review, and *when* to ship. These aren't generic prompts - they're the kind of opinionated, process-driven workflows that separate production-quality work from prototype-quality work.
 
 Skills bake in best practices from Google's engineering culture — including concepts from [Software Engineering at Google](https://abseil.io/resources/swe-book) and Google's [engineering practices guide](https://google.github.io/eng-practices/). You'll find Hyrum's Law in API design, the Beyonce Rule and test pyramid in testing, change sizing and review speed norms in code review, Chesterton's Fence in simplification, trunk-based development in git workflow, Shift Left and feature flags in CI/CD, and a dedicated deprecation skill treating code as a liability. These aren't abstract principles — they're embedded directly into the step-by-step workflows agents follow.
-
----
-
-## How it compares
-
-Wondering how this stacks up against [Superpowers](https://github.com/obra/superpowers) or [Matt Pocock's skills](https://github.com/mattpocock/skills)? See **[docs/comparison.md](docs/comparison.md)** for an honest, side-by-side look at how the three are shaped differently and when to reach for each — including a link to a controlled [head-to-head experiment](https://www.linkedin.com/pulse/superpowers-vs-agent-skills-faster-shipping-safer-reasoning-om-mishra-dzakf/).
 
 ---
 
@@ -392,15 +261,15 @@ See [docs/skill-anatomy.md](docs/skill-anatomy.md) for the format specification 
 
 ---
 
-## Team
+## Attribution
 
-agent-skills is built and maintained by:
+This is a hard fork of an MIT-licensed upstream project, taken at a pinned commit and merged
+periodically. It is **not affiliated with, endorsed by, or published by** that project or its
+author — bugs here are ours, and should not be reported upstream.
 
-| | Name | GitHub | Role |
-|---|------|--------|------|
-| <img src="https://github.com/addyosmani.png?size=120" width="60" height="60" alt="Addy Osmani"> | **Addy Osmani** | [@addyosmani](https://github.com/addyosmani) | Creator |
-| <img src="https://github.com/federicobartoli.png?size=120" width="60" height="60" alt="Federico Bartoli"> | **Federico Bartoli** | [@federicobartoli](https://github.com/federicobartoli) | Collaborator |
-| <img src="https://github.com/nucliweb.png?size=120" width="60" height="60" alt="Joan León"> | **Joan León** | [@nucliweb](https://github.com/nucliweb) | Collaborator |
+The derivation, the base commit, the sync procedure, and a per-file register of what is inherited
+versus what is ours are all in **[NOTICE.md](NOTICE.md)**. The upstream copyright is preserved
+verbatim in **[LICENSE](LICENSE)**.
 
 ---
 

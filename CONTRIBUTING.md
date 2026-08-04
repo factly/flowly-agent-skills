@@ -1,6 +1,8 @@
-# Contributing to Agent Skills
+# Contributing to flowly-agent-skills
 
 Thanks for your interest in contributing! This project is a collection of production-grade engineering skills for AI coding agents.
+
+This repository is a fork. Pull requests and issues belong here, on `factly/flowly-agent-skills` — not on the project it was forked from. Bugs you find here are ours; see [NOTICE.md](NOTICE.md) for the attribution and the upstream base.
 
 New here? [docs/developer-onboarding.md](docs/developer-onboarding.md) is a guided tour of how the repo fits together (the five layers, the verification loop, and the contribution paths) and tells you when to read this document, [skill-anatomy.md](docs/skill-anatomy.md), and [evals/README.md](evals/README.md). This file is the authoritative rulebook; the onboarding guide is the map.
 
@@ -68,7 +70,7 @@ The frontmatter fields above are required. The section anatomy is a recommended 
 
 ## Repo-scoped files
 
-`AGENTS.md` and `CLAUDE.md` at the repo root configure agents working on the [`addyosmani/agent-skills`](https://github.com/addyosmani/agent-skills) repository itself. When writing setup guides or docs, do not instruct users to copy these files into their own projects or into a global agent configuration; the reusable assets are the skills in `skills/`.
+`AGENTS.md` and `CLAUDE.md` at the repo root configure agents working on the [`factly/flowly-agent-skills`](https://github.com/factly/flowly-agent-skills) repository itself. When writing setup guides or docs, do not instruct users to copy these files into their own projects or into a global agent configuration; the reusable assets are the skills in `skills/`.
 
 ## Translations
 
@@ -113,7 +115,7 @@ Open an issue if you find:
 
 If a skill's guidance was wrong, outdated, or did not apply in your project
 (for example, it assumed `npm test` in a Maven or Gradle repo), use the
-[Skill gap](https://github.com/addyosmani/agent-skills/issues/new?template=skill-gap.yml)
+[Skill gap](https://github.com/factly/flowly-agent-skills/issues/new?template=skill-gap.yml)
 issue form. It asks for the affected skill, the relevant excerpt, your project
 context, and what you did instead — enough for maintainers to triage without a
 freeform write-up.
