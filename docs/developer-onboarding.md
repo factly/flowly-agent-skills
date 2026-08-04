@@ -14,7 +14,7 @@ The repo has five composable layers. Understanding what each one is *for* preven
 |---|---|---|---|
 | **Skills** | `skills/<name>/SKILL.md` | Step-by-step workflows with verification gates | *How* |
 | **Personas** | `agents/<role>.md` | Roles with a perspective and output format | *Who* |
-| **Commands** | `.claude/commands/` | User-facing entry points; the orchestration layer | *When* |
+| **Commands** | `commands/` | User-facing entry points; the orchestration layer | *When* |
 | **References** | `references/*.md` | Checklists skills pull in on demand | *What to check* |
 | **Evals** | `evals/cases/<name>.json` | Proof that skills trigger and behave correctly | *Does it work* |
 

@@ -30,7 +30,7 @@ Before writing any code, operate in read-only mode:
 - Map dependencies between components
 - Note risks and unknowns
 
-**Do NOT write code during planning.** The output is a plan document saved to `tasks/plan.md` and a task list saved to `tasks/todo.md`, not implementation.
+**Do NOT write code during planning.** The output is a plan document written to the issue with `put_planning_doc(kind="plan")` and a task list written with `put_todo_tasks`, not implementation.
 
 ### Step 2: Identify the Dependency Graph
 
@@ -140,12 +140,12 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 - It touches two or more independent subsystems (e.g., auth and billing)
 - You find yourself writing "and" in the task title (a sign it is two tasks)
 
-## Output Files
+## Outputs
 
-- **Plan document:** Save the implementation plan to `tasks/plan.md`.
-- **Task list:** Save the checklist-style task list to `tasks/todo.md`.
+- **Plan document:** Write the implementation plan to the issue with `put_planning_doc(kind="plan")`.
+- **Task list:** Write the checklist-style task list with `put_todo_tasks`, which renders the issue's `todo` doc from your task objects.
 
-Create the `tasks/` directory if it does not exist. These paths are the convention expected by the `/build` command and other downstream tooling.
+Nothing goes into the working tree. These are the outputs the `/flowly:build` command and other downstream tooling read back from the issue.
 
 ## Plan Document Template
 

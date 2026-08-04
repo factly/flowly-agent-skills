@@ -29,7 +29,7 @@
     {
       "id": 1,
       "prompt": "Break the attached notifications spec into an executable plan.",
-      "expected_output": "Ordered tasks in tasks/plan.md, each small, verifiable, with acceptance criteria and dependencies",
+      "expected_output": "Ordered tasks in the Flowly issue's plan and todo planning docs, each small, verifiable, with acceptance criteria and dependencies",
       "files": [
         "planning-and-task-breakdown"
       ],

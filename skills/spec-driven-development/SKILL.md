@@ -140,7 +140,7 @@ With the validated spec, generate a technical implementation plan:
 
 > Follow `planning-and-task-breakdown` for the dependency-graph mapping and vertical-slicing mechanics behind these steps; it is the canonical source. The bullets above are a lightweight summary; if they ever diverge, `planning-and-task-breakdown` takes precedence.
 >
-> **Output convention:** Save the plan to `tasks/plan.md` and the task list to `tasks/todo.md`, per the `/plan` command convention. Create `tasks/` if it does not exist. Downstream commands (`/build`, etc.) expect these paths.
+> **Output convention:** The plan and the task list belong to the Flowly issue, not to the working tree. Write the plan with `put_planning_doc(kind="plan")` and the task list with `put_todo_tasks`, per the `/flowly:plan` command convention. Downstream commands (`/flowly:build`, etc.) read them back from the issue.
 
 The plan should be reviewable: the human should be able to read it and say "yes, that's the right approach" or "no, change X."
 
@@ -174,7 +174,7 @@ The spec is a living document, not a one-time artifact:
 
 - **Update when decisions change** — If you discover the data model needs to change, update the spec first, then implement.
 - **Update when scope changes** — Features added or cut should be reflected in the spec.
-- **Commit the spec** — The spec belongs in version control alongside the code.
+- **Keep the spec on the issue** — The spec is the issue's `research` planning doc, written with `put_planning_doc`, not a document alongside the code.
 - **Reference the spec in PRs** — Link back to the spec section that each PR implements.
 
 ## Common Rationalizations
@@ -203,4 +203,4 @@ Before proceeding to implementation, confirm:
 - [ ] The human has reviewed and approved the spec
 - [ ] Success criteria are specific and testable
 - [ ] Boundaries (Always/Ask First/Never) are defined
-- [ ] The spec is saved to a file in the repository
+- [ ] The spec is written to the Flowly issue with `put_planning_doc(kind="research")`, not to a file in the repository

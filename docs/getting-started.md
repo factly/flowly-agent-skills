@@ -104,7 +104,7 @@ Load an agent definition when you need specialized review. For example, ask your
 
 ## Using Commands
 
-The `.claude/commands/` directory contains slash commands for Claude Code:
+The `commands/` directory contains slash commands for Claude Code:
 
 | Command | Skill Invoked |
 |---------|---------------|
@@ -143,11 +143,11 @@ integration, clone the repository, or copy the needed checklist into a
 
 ## Spec and task artifacts
 
-The `/spec` and `/plan` commands create working artifacts (`SPEC.md`, `tasks/plan.md`, `tasks/todo.md`). Treat them as **living documents** while the work is in progress:
+The `/flowly:research` and `/flowly:plan` commands create working artifacts on the Flowly issue — its `research`, `plan`, `todo` and `risks` planning docs, written with `put_planning_doc` and `put_todo_tasks`. Treat them as **living documents** while the work is in progress:
 
-- Keep them in version control during development so the human and the agent have a shared source of truth.
-- Update them when scope or decisions change.
-- If your repo doesn’t want these files long‑term, delete them before merge or add the folder to `.gitignore` — the workflow doesn’t require them to be permanent.
+- They live on the issue, so the human and the agent share one source of truth without either holding a copy.
+- Update them when scope or decisions change, by writing the doc again.
+- Nothing is written to your working tree, so there is no file to commit, delete before merge, or add to `.gitignore`.
 
 ## Tips
 

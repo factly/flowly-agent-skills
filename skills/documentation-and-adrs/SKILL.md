@@ -41,7 +41,9 @@ Before creating an ADR, inspect the available repository context for an establis
 - **Numbering and naming** — continue the existing sequence and filename pattern (`ADR-004-Title.rst`, `0004-title.md`, …); don't restart at 001 or introduce a second scheme.
 - **Section headings** — reuse the project's heading set rather than imposing this template's.
 
-If the available evidence conflicts, surface the conflict rather than silently introducing another scheme. Only when no convention can be established do you apply the default below.
+If the available evidence conflicts, surface the conflict rather than silently introducing another scheme.
+
+If the project already has a home for decision records, it wins: match it and stop here. Only when no convention can be established do you choose a destination — the default below when the ADR belongs in the repository, or, when the work is tracked on a Flowly issue, that issue's `plan` doc via `put_planning_doc`, which puts the reasoning where the reviewer and every later agent already look.
 
 ### ADR Template
 

@@ -85,6 +85,8 @@ Load the relevant spec section when starting a feature. Don't load the entire sp
 
 **Wasteful:** "Here's our entire 5000-word spec: [full spec]" (when only working on auth)
 
+When the work is tracked on a Flowly issue, none of this is a file: `list_planning_docs` returns the issue's `research`, `plan`, `todo` and `risks` docs, and `get_project_assets` returns the project's standing conventions. Load the one the task needs, not all four.
+
 ### Level 3: Relevant Source Files
 
 Before editing a file, read it. Before implementing a pattern, find an existing example in the codebase.

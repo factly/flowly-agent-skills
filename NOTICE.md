@@ -59,6 +59,14 @@ files reached no user; what they still did was load as *project* commands for an
 repository, under names that collided with ours and pointing at a plugin namespace that no longer
 exists.
 
+`skills/idea-refine/scripts/idea-refine.sh` went later still, when the inherited corpus was rebound.
+Its entire body was `IDEAS_DIR="docs/ideas"` and a `mkdir -p`: it existed to create the directory
+that skill saved its one-pager into. Under the binding a refined idea becomes a Flowly issue, so the
+directory never exists and the script has no job left to do. It is recorded here rather than merely
+dropped from the register, because "an inherited file is gone" is the one change a merge cannot tell
+apart from "an inherited file was never here" — upstream will offer it back on the next sync, and the
+answer is no. Its `scripts/` directory was empty afterwards and went with it.
+
 ## Surviving references to upstream
 
 Upstream's *identity* is stripped: no hero image, no badge, no maintainer table, no install line
@@ -112,8 +120,15 @@ merge conflict in this directory means upstream has started using a path we took
 At the fork every file was `unchanged` — the correct starting state, and what makes the first monthly
 merge reviewable. Rows leave that state one at a time, and each departure is a claim a check can
 test: `new` and `owned` skill directories must carry the `flowly-` prefix, `unchanged` ones must
-still be byte-identical to the base. Nothing inherited has been edited in place yet; every non-
-`unchanged` row so far is a file with no upstream counterpart.
+still be byte-identical to the base.
+
+`bound` is the status that costs money, so it is asserted in both directions. A file marked `bound`
+must exist at the base **and differ from it** — the first because there is nothing to be bound to
+otherwise, the second because `bound` is what tells a reviewer to read a hunk by eye on every merge.
+A row carrying it with no edit behind it buys that effort forever and gets nothing; worse, a file
+that was *meant* to be rebound and never was reads as finished. Until the first rebinding landed
+there were no `bound` rows, and the reverse assertion did not exist — every row that word could have
+carried would have been an unverified claim.
 
 ### Files
 
@@ -141,29 +156,28 @@ still be byte-identical to the base. Nothing inherited has been edited in place 
 | `skills/ci-cd-and-automation/SKILL.md` | `unchanged` |
 | `skills/code-review-and-quality/SKILL.md` | `unchanged` |
 | `skills/code-simplification/SKILL.md` | `unchanged` |
-| `skills/context-engineering/SKILL.md` | `unchanged` |
+| `skills/context-engineering/SKILL.md` | `bound` |
 | `skills/debugging-and-error-recovery/SKILL.md` | `unchanged` |
 | `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
-| `skills/documentation-and-adrs/SKILL.md` | `unchanged` |
+| `skills/documentation-and-adrs/SKILL.md` | `bound` |
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
 | `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
 | `skills/git-workflow-and-versioning/SKILL.md` | `unchanged` |
-| `skills/idea-refine/SKILL.md` | `unchanged` |
+| `skills/idea-refine/SKILL.md` | `bound` |
 | `skills/idea-refine/examples.md` | `unchanged` |
 | `skills/idea-refine/frameworks.md` | `unchanged` |
 | `skills/idea-refine/refinement-criteria.md` | `unchanged` |
-| `skills/idea-refine/scripts/idea-refine.sh` | `unchanged` |
 | `skills/incremental-implementation/SKILL.md` | `unchanged` |
-| `skills/interview-me/SKILL.md` | `unchanged` |
+| `skills/interview-me/SKILL.md` | `bound` |
 | `skills/observability-and-instrumentation/SKILL.md` | `unchanged` |
-| `skills/performance-optimization/SKILL.md` | `unchanged` |
-| `skills/planning-and-task-breakdown/SKILL.md` | `unchanged` |
+| `skills/performance-optimization/SKILL.md` | `bound` |
+| `skills/planning-and-task-breakdown/SKILL.md` | `bound` |
 | `skills/security-and-hardening/SKILL.md` | `unchanged` |
 | `skills/shipping-and-launch/SKILL.md` | `unchanged` |
 | `skills/source-driven-development/SKILL.md` | `unchanged` |
-| `skills/spec-driven-development/SKILL.md` | `unchanged` |
+| `skills/spec-driven-development/SKILL.md` | `bound` |
 | `skills/test-driven-development/SKILL.md` | `unchanged` |
 | `skills/using-agent-skills/SKILL.md` | `unchanged` |

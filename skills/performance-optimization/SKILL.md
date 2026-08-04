@@ -322,7 +322,7 @@ Reverted work leaves no trace in git history, which is exactly why the same dead
 | Virtualize the list | INP 240ms → 90ms | kept | Long tasks gone from the trace. |
 | Preconnect to the API origin | LCP 2.8s → 2.8s | reverted | Already same-origin. |
 
-A section in the PR description or a `PERF.md` in the repo both work. What matters is that the next person (or the next agent) reads it before proposing an experiment, and doesn't re-run one that already failed.
+If the project already has somewhere this belongs — a performance log, a benchmarks page, a section in the PR description — put it there. Only when it has none does the ledger need a new home, and when the work is tracked on a Flowly issue that home is the issue: post it with `add_comment`. What matters is that the next person (or the next agent) reads it before proposing an experiment, and doesn't re-run one that already failed.
 
 ## Performance Budget
 

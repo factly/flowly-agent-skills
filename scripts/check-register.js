@@ -25,6 +25,15 @@
  *      byte-identical to its blob at the base SHA. Without this, `unchanged`
  *      is a label a human typed, and the register's whole purpose (knowing
  *      what a merge may safely overwrite) rests on it.
+ *   5. `bound` means bound — every file marked `bound` exists at the base and
+ *      DIFFERS from it. This is check 4 run the other way, and it is the one
+ *      that keeps the register honest in the direction that costs money:
+ *      `bound` is the status that says "review this hunk by eye on every
+ *      merge", so a row that carries it without an edit behind it buys
+ *      permanent review effort for nothing — and, worse, a file that was
+ *      *meant* to be rebound but never was reads as done forever. Only
+ *      check 4 existed until the first rebinding landed, at which point
+ *      every `bound` row in the table was an unverified claim.
  *
  * The base SHA and the upstream URL are parsed out of NOTICE.md rather than
  * hardcoded here. The register is the source of truth; this file is its reader.
@@ -349,6 +358,41 @@ function checkUnchanged(rows, sha, upstream, report) {
   return errors.length;
 }
 
+function checkBound(rows, sha, upstream, report) {
+  const errors = [];
+  const marked = rows.filter(r => r.status === 'bound');
+
+  for (const { file } of marked) {
+    let base;
+    try {
+      base = git(['show', `${sha}:${file}`], 'buffer');
+    } catch (err) {
+      // `bound` is defined as inherited-then-edited. A file with no blob at the
+      // base was never inherited, so the row is the wrong word rather than a
+      // missing edit — say which word it wants.
+      errors.push(`marked bound but does not exist at the base: ${file}`);
+      errors.push('  ↳ nothing upstream to be bound to — this is `new`.');
+      continue;
+    }
+
+    const working = fs.readFileSync(path.join(REPO_ROOT, file));
+    if (working.equals(base)) {
+      errors.push(`marked bound but is byte-identical to the base: ${file}`);
+      if (upstream !== null) {
+        errors.push(`  ↳ compare: ${upstream}/blob/${sha}/${file}`);
+      }
+      errors.push('  ↳ either make the binding edit, or set its status back to `unchanged`.');
+    }
+  }
+
+  report(
+    errors,
+    '`bound` really is bound',
+    `${marked.length} file(s) marked bound are inherited and do differ from the base`,
+  );
+  return errors.length;
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -417,8 +461,10 @@ function main() {
   // all 39 files as differing and bury the one error that matters.
   if (sha !== null && /^[0-9a-f]{40}$/.test(sha) && gitOk(['rev-parse', '--verify', `${sha}^{commit}`])) {
     errorCount += checkUnchanged(rows, sha, upstream, report);
+    errorCount += checkBound(rows, sha, upstream, report);
   } else {
     console.log('  –  `unchanged` really is unchanged — skipped, the base SHA above is unusable');
+    console.log('  –  `bound` really is bound — skipped, the base SHA above is unusable');
   }
 
   const status = errorCount > 0 ? 'FAILED' : 'PASSED';
