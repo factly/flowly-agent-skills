@@ -6,7 +6,7 @@
  * The register is what a monthly upstream merge is resolved against, so it is
  * only worth having if it is true: this script is its reader.
  *
- * It asserts four things, and reports them separately:
+ * It asserts the following, and reports each separately:
  *
  *   1. Bidirectional completeness — every tracked file in the four in-scope
  *      trees has exactly one register row, and every register row names a
@@ -14,6 +14,10 @@
  *      tree but not the register is an addition nobody registered; a row with
  *      no file is a stale row.
  *   2. Status validity — every status is one of the four defined words.
+ *   2a. Skill directory naming — a skill the register calls ours (`new` or
+ *      `owned`) carries the `flowly-` prefix, and one it calls inherited
+ *      (`unchanged` or `bound`) does not. The register is the only thing that
+ *      knows which is which; the directory name is what is being checked.
  *   3. The base SHA recorded in the § Base table is a real commit and an
  *      ancestor of HEAD. Nothing else in the repository reads that SHA, so
  *      without this it is a claim rather than a fact.
@@ -263,6 +267,57 @@ function checkBaseSha(sha, report) {
   return errors.length;
 }
 
+/**
+ * Flowly-native skill directories carry the `flowly-` prefix; inherited ones
+ * keep upstream's names. The register is what says which is which — `new` and
+ * `owned` are ours, `unchanged` and `bound` came from upstream — so this rule
+ * has to be read from the register rather than guessed from the directory name,
+ * which is the thing being checked.
+ *
+ * Only the native side is prefixed, deliberately. The open standard ties
+ * frontmatter `name` to the directory name, so prefixing all 24 inherited
+ * skills would edit every SKILL.md before any content change and put every
+ * future merge on a renamed path — taxing the exact property that made a fork
+ * cheaper than a generator. The collision that would prevent is a user
+ * receiving our near-identical fork of a file they asked for.
+ *
+ * This runs before the native skills exist, on purpose: standing the gate up
+ * after the thing it governs is how a naming rule gets fitted to whatever was
+ * already typed.
+ */
+function checkSkillPrefix(rows, report) {
+  const PREFIX = 'flowly-';
+  const NATIVE = new Set(['new', 'owned']);
+  const errors  = [];
+  const skills  = new Map();
+
+  for (const { file, status } of rows) {
+    const m = /^skills\/([^/]+)\/SKILL\.md$/.exec(file);
+    if (m !== null) skills.set(m[1], status);
+  }
+
+  for (const [dir, status] of skills) {
+    const prefixed = dir.startsWith(PREFIX);
+    const native   = NATIVE.has(status);
+
+    if (native && !prefixed) {
+      errors.push(`registered \`${status}\` (ours) but not prefixed \`${PREFIX}\`: skills/${dir}`);
+      errors.push('  ↳ rename the directory and its frontmatter `name` together — the standard requires they match.');
+    } else if (!native && prefixed) {
+      errors.push(`prefixed \`${PREFIX}\` but registered \`${status}\` (inherited): skills/${dir}`);
+      errors.push('  ↳ an inherited directory keeps upstream\'s name, or every future merge lands on a renamed path.');
+    }
+  }
+
+  const nativeCount = [...skills.values()].filter(s => NATIVE.has(s)).length;
+  report(
+    errors,
+    'skill directory naming',
+    `${skills.size} skill(s) — ${nativeCount} ours (prefixed \`${PREFIX}\`), ${skills.size - nativeCount} inherited (upstream names)`,
+  );
+  return errors.length;
+}
+
 function checkUnchanged(rows, sha, upstream, report) {
   const errors = [];
   const marked = rows.filter(r => r.status === 'unchanged');
@@ -355,6 +410,7 @@ function main() {
 
   errorCount += checkCompleteness(rows, tracked, report);
   errorCount += checkStatuses(rows, report);
+  errorCount += checkSkillPrefix(rows, report);
   errorCount += checkBaseSha(sha, report);
 
   // Only meaningful once the base SHA is known good; a bad SHA would report

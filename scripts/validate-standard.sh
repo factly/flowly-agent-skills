@@ -62,6 +62,38 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 REPO_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
 SKILLS_DIR="$REPO_ROOT/skills"
 
+# --- Optional: the standard's own reference validator ------------------------
+# `skills-ref` is the validator the spec names. It is OFF by default and opt-in
+# via `--reference`, because driving it on every run would put an npm download
+# on the critical path of a check that must work on a public repository's first
+# commit, and because — as the header explains — it enforces the spec's
+# six-field set rather than our two, so it cannot replace the rules below.
+#
+# It is wired anyway rather than measured once, because "every skill is valid
+# under the open standard" is a claim about the corpus that changes every time
+# a skill is added. A claim nothing can re-check is a claim that rots.
+#
+# Pinned deliberately: an unpinned validator turns an upstream release into a
+# surprise failure in our repository. Raise it on purpose, having read the diff.
+SKILLS_REF_PKG="skills-ref@0.1.5"
+RUN_REFERENCE=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --reference) RUN_REFERENCE=1 ;;
+    -h|--help)
+      printf 'Usage: %s [--reference]\n\n' "$(basename -- "$0")"
+      printf '  --reference   also run %s over every skill (needs npx)\n' "$SKILLS_REF_PKG"
+      exit 0
+      ;;
+    *)
+      printf 'ERROR: unknown option "%s" (try --help)\n' "$1" >&2
+      exit 1
+      ;;
+  esac
+  shift
+done
+
 # Spec: exactly these two keys are permitted here (see rationale above).
 ALLOWED_KEYS="name description"
 
@@ -209,5 +241,33 @@ done
 printf '\n%s skills checked against %s — %s violation(s) — %s\n' \
   "$skill_count" "https://agentskills.io/specification" "$errors" \
   "$([ "$errors" -eq 0 ] && printf 'PASSED' || printf 'FAILED')"
+
+# --- The reference validator, when asked -------------------------------------
+if [ "$RUN_REFERENCE" -eq 1 ]; then
+  if ! command -v npx >/dev/null 2>&1; then
+    printf '\nERROR: --reference needs npx on PATH, and it is not there.\n' >&2
+    printf '       Refusing to report a pass for a validator that never ran.\n' >&2
+    exit 1
+  fi
+
+  printf '\nReference validator — %s\n\n' "$SKILLS_REF_PKG"
+  ref_errors=0
+  for dir in "$SKILLS_DIR"/*/; do
+    [ -d "$dir" ] || continue
+    name=$(basename "$dir")
+    if ref_out=$(npx --yes "$SKILLS_REF_PKG" validate "$dir" 2>&1); then
+      printf '  ok   %s\n' "$name"
+    else
+      printf '  FAIL %s\n' "$name"
+      printf '%s\n' "$ref_out" | sed 's/^/       /'
+      ref_errors=$((ref_errors + 1))
+      errors=$((errors + 1))
+    fi
+  done
+
+  printf '\n%s skills checked by the reference validator — %s violation(s) — %s\n' \
+    "$skill_count" "$ref_errors" \
+    "$([ "$ref_errors" -eq 0 ] && printf 'PASSED' || printf 'FAILED')"
+fi
 
 [ "$errors" -eq 0 ] || exit 1
