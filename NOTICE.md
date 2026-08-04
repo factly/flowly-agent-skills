@@ -168,6 +168,8 @@ carried would have been an unverified claim.
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/flowly-plan-gate/SKILL.md` | `new` |
+| `skills/flowly-review/SKILL.md` | `new` |
+| `skills/flowly-ship/SKILL.md` | `new` |
 | `skills/flowly-verify/SKILL.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
 | `skills/git-workflow-and-versioning/SKILL.md` | `bound` |

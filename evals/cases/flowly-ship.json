@@ -1,0 +1,44 @@
+{
+  "skill_name": "flowly-ship",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Cut a Flowly release for this week's work and put FLO-1201 and FLO-1204 in it",
+        "top_k": 3
+      },
+      {
+        "prompt": "Create a release in Flowly for the March batch and add the issues that are going out with it",
+        "top_k": 3
+      },
+      {
+        "prompt": "Which Flowly releases is FLO-77 in, and has that release gone out yet?",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Set up monitoring and a rollback plan before Friday's production deploy",
+        "owner": "shipping-and-launch"
+      },
+      {
+        "prompt": "Tag v2.0.0 and write the changelog for it",
+        "owner": "git-workflow-and-versioning"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "We go live with the new billing flow tomorrow. Set up the release.",
+      "expected_output": "A Flowly release recorded as a dated bundle of issues, with the readiness work routed to the pre-launch skill rather than performed here",
+      "expectations": [
+        "Creating the release is described as recording what a set of issues amounts to, and as deploying nothing by itself",
+        "The readiness work — checklist, rollback plan, monitoring, staged rollout — is routed to the shipping-and-launch skill rather than answered from the release tools",
+        "The release is created with a name that must be unique within the team, and its member issues are added by FLO identifier",
+        "The status is left at planned or in_progress until the deploy has actually happened, rather than set to released up front",
+        "No claim is made that Flowly validates the version string or enforces a versioning policy"
+      ]
+    }
+  ]
+}

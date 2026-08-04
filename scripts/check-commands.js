@@ -93,10 +93,15 @@ const MAX_MIGRATED_BYTES = 4000;
 // direction: when one of these skills lands, the check goes red asking for the
 // entry to be deleted. An exemption that can only be removed by a human who
 // happens to remember it is an exemption that becomes permanent.
-const PLANNED_SKILLS = new Map([
-  ['flowly-review',    'the Review phase skill, authored in the Flowly-native skills phase'],
-  ['flowly-ship',      'the Ship phase skill, authored in the Flowly-native skills phase'],
-]);
+//
+// It is empty, and that is a state worth reading rather than a stub. It carried
+// five entries — flowly-define, flowly-plan-gate, flowly-verify, flowly-review
+// and flowly-ship — from the commit that authored the six commands until the
+// Flowly-native skills landed, and each one was deleted in the commit that made
+// its skill real, because the second direction turned red the moment the
+// directory appeared. An empty map here is the check reporting that every
+// exemption it ever held has been discharged, not an exemption being waived.
+const PLANNED_SKILLS = new Map([]);
 
 // The plugin namespace skills are addressed through, from `.claude-plugin/plugin.json`.
 const SKILL_NAMESPACE = 'flowly';
