@@ -165,6 +165,7 @@ carried would have been an unverified claim.
 | `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-connect/SKILL.md` | `new` |
 | `skills/flowly-define/SKILL.md` | `new` |
+| `skills/flowly-loop-runs/SKILL.md` | `new` |
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/flowly-plan-gate/SKILL.md` | `new` |
