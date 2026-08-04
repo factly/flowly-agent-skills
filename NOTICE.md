@@ -163,6 +163,7 @@ carried would have been an unverified claim.
 | `skills/documentation-and-adrs/SKILL.md` | `bound` |
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
 | `skills/flowly-build/SKILL.md` | `new` |
+| `skills/flowly-connect/SKILL.md` | `new` |
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |

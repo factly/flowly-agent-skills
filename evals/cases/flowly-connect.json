@@ -1,0 +1,48 @@
+{
+  "skill_name": "flowly-connect",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Flowly's MCP tools aren't showing up in my session and every call comes back 401",
+        "top_k": 3
+      },
+      {
+        "prompt": "How do I point my MCP client at our Flowly instance and prove the credential works?",
+        "top_k": 3
+      },
+      {
+        "prompt": "A Flowly tool call came back saying my credential doesn't hold some scope — do I need a new one?",
+        "top_k": 3
+      },
+      {
+        "prompt": "Set this repo up to talk to our Flowly instance over MCP — I have the URL but nothing connects",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "The tests started failing after my last change — find the root cause",
+        "owner": "debugging-and-error-recovery"
+      },
+      {
+        "prompt": "Harden this endpoint that accepts untrusted user input before we ship it",
+        "owner": "security-and-hardening"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Flowly's tools aren't available in this session — the door keeps answering 503. Just write up the plan for FLO-1201 so we don't lose the work.",
+      "expected_output": "The 503 identified as the agent door being switched off rather than a credential problem, with the plan held in the conversation and no planning artifact written to the working tree",
+      "expectations": [
+        "The agent names 503 as the door being switched off and says a new credential would not change the answer",
+        "The agent does not rotate, reissue, or ask for a different credential in response to the 503",
+        "No plan, todo, spec, or status file is written to the working tree as a substitute for the Flowly planning docs",
+        "The agent proposes an identity call with whoami as the check once the operator re-enables the door",
+        "No instance hostname or URL is invented, guessed, or written into a file"
+      ]
+    }
+  ]
+}
