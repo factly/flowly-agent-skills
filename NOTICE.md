@@ -47,3 +47,82 @@ to rot, because each one is a manifest or a command set that would have to be ke
 `.codex-plugin/plugin.json` is **kept**. The Codex door is not shipped and not tested, but it is held
 openable by two authoring rules that cost nothing: no substitution token in any command body, and
 skill frontmatter limited to `name` and `description`.
+
+## Ownership register
+
+Every file this fork ships from upstream's content trees is listed below with a status that says what
+an upstream merge may do to it. This table is what a merge is resolved against, so it is only worth
+having if it is true: `scripts/check-register.js` reads it and asserts that the tree and the table
+describe the same set of files, that every status is one of the four words defined below, that the
+base SHA above is a real commit and an ancestor of `HEAD`, and that every file marked `unchanged` is
+byte-identical to its blob at that SHA.
+
+### Scope
+
+The register covers **every tracked file** under `skills/`, `references/`, `agents/` and `commands/` —
+not only `SKILL.md`. Everything else in the repository is deliberately outside it, and its absence
+here is not an oversight: `scripts/`, `docs/`, `evals/`, `hooks/`, `.github/`, `.claude/`,
+`.claude-plugin/`, `.codex-plugin/`, and the root files (`README.md`, `CLAUDE.md`, `AGENTS.md`,
+`CONTRIBUTING.md`, `LICENSE`, `NOTICE.md`, `plugin.json`, `.gitignore`, `.gitattributes`). Those are
+fork infrastructure — tooling, CI and prose we maintain outright — and tracking them row by row would
+make the register churn on work that has nothing to do with a merge.
+
+`commands/` contributes no rows. Upstream's Antigravity commands were removed at import (above) and
+git does not track empty directories, so the path does not exist in the tree yet. This fork's own
+lifecycle commands are authored later, and will be registered as `new`.
+
+### Statuses
+
+| Status | Meaning |
+|---|---|
+| `unchanged` | Inherited from upstream and byte-identical to the base SHA. Merges freely; a conflict here means upstream moved and we did not. |
+| `bound` | Inherited, then edited to point at Flowly instead of the filesystem. Every merge that touches one of these needs review by eye, because upstream reverting a destination is the one failure that is silent. |
+| `owned` | An inherited path we have taken over. Never merged from upstream. |
+| `new` | Ours outright, with no upstream counterpart. |
+
+At the fork every file is `unchanged`: no binding edits have been made yet. That is the correct
+starting state, and it is exactly what makes the first monthly merge reviewable.
+
+### Files
+
+| File | Status |
+|---|---|
+| `agents/code-reviewer.md` | `unchanged` |
+| `agents/security-auditor.md` | `unchanged` |
+| `agents/test-engineer.md` | `unchanged` |
+| `agents/web-performance-auditor.md` | `unchanged` |
+| `references/accessibility-checklist.md` | `unchanged` |
+| `references/definition-of-done.md` | `unchanged` |
+| `references/observability-checklist.md` | `unchanged` |
+| `references/orchestration-patterns.md` | `unchanged` |
+| `references/performance-checklist.md` | `unchanged` |
+| `references/security-checklist.md` | `unchanged` |
+| `references/testing-patterns.md` | `unchanged` |
+| `skills/api-and-interface-design/SKILL.md` | `unchanged` |
+| `skills/browser-testing-with-devtools/SKILL.md` | `unchanged` |
+| `skills/ci-cd-and-automation/SKILL.md` | `unchanged` |
+| `skills/code-review-and-quality/SKILL.md` | `unchanged` |
+| `skills/code-simplification/SKILL.md` | `unchanged` |
+| `skills/context-engineering/SKILL.md` | `unchanged` |
+| `skills/debugging-and-error-recovery/SKILL.md` | `unchanged` |
+| `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
+| `skills/documentation-and-adrs/SKILL.md` | `unchanged` |
+| `skills/doubt-driven-development/SKILL.md` | `unchanged` |
+| `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
+| `skills/git-workflow-and-versioning/SKILL.md` | `unchanged` |
+| `skills/idea-refine/SKILL.md` | `unchanged` |
+| `skills/idea-refine/examples.md` | `unchanged` |
+| `skills/idea-refine/frameworks.md` | `unchanged` |
+| `skills/idea-refine/refinement-criteria.md` | `unchanged` |
+| `skills/idea-refine/scripts/idea-refine.sh` | `unchanged` |
+| `skills/incremental-implementation/SKILL.md` | `unchanged` |
+| `skills/interview-me/SKILL.md` | `unchanged` |
+| `skills/observability-and-instrumentation/SKILL.md` | `unchanged` |
+| `skills/performance-optimization/SKILL.md` | `unchanged` |
+| `skills/planning-and-task-breakdown/SKILL.md` | `unchanged` |
+| `skills/security-and-hardening/SKILL.md` | `unchanged` |
+| `skills/shipping-and-launch/SKILL.md` | `unchanged` |
+| `skills/source-driven-development/SKILL.md` | `unchanged` |
+| `skills/spec-driven-development/SKILL.md` | `unchanged` |
+| `skills/test-driven-development/SKILL.md` | `unchanged` |
+| `skills/using-agent-skills/SKILL.md` | `unchanged` |
