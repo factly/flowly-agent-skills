@@ -7,7 +7,9 @@ description: Walks a Flowly parent issue's child issues to done one at a time, d
 
 ## Overview
 
-By the time this skill applies, the plan is written, a human has approved it, and conversion has turned its tasks into child issues. Building is therefore not a fresh judgement about what to do next — it is a walk over a queue Flowly already holds, one child at a time, with the tracker recording position as the run goes.
+By the time this skill applies, the plan is written, a human has approved it, and conversion has turned its tasks into child issues. Building is therefore not a fresh judgement about what to do next — it is a walk over a queue Flowly already holds, **one child issue at a time**, with the tracker recording position as the run goes.
+
+One at a time is the rule, not a pacing preference. The child issue is the unit that carries a status, a commit and a rollback point, and two children in flight share all three and leave none of them. Start the next child only once the one before it is `done` or `canceled`.
 
 The queue is derived from the issue graph on every run. Nothing about it is cached locally, and no file on disk records where the run got to. That is what makes an interrupted run resumable and an autonomous run safe to stop.
 
@@ -63,26 +65,44 @@ So the count is the check. Read the parent's task list — `list_planning_docs(p
 
 Sort by issue number ascending, always. That ascending order *is* the dependency order conversion produced, and it is the only surviving record of it. Never take the returned order as the execution order, and never infer order from titles.
 
-### When ascending number is not enough
+### Recover the dependency graph from the parent's todo doc
 
-The dependency graph does not reach the child issue: a child's body deliberately omits its dependencies, because a task's number is local to the parent's task list and names nothing once the children exist. Mapping those dependencies onto real issue identifiers is a known, unimplemented gap. So a child that looks self-contained may not be.
+**The dependency graph does not reach the child issue.** When the plan was written, each task could declare `depends_on`, and conversion consumed it: it created the children sorted by that graph and numbered them in that order. Sorting is all `depends_on` does. The child issue's own body does not carry the dependency — a task's number is local to the parent's task list and names nothing once the children exist, so there was nothing to copy across.
 
-The graph does still exist, in the parent's `todo` planning doc. When order matters beyond "ascending number" — a child that fails because something it needs is not there yet — read that doc with `list_planning_docs(parent)` and match each task to its child **by title**: the child's title is the task's title verbatim. Match on titles and read the prose; do not depend on the document's markdown shape, which the server owns and changes on its own schedule.
+Two consequences, and the loop depends on both:
+
+- **Ascending child number is a valid execution order** — but only because conversion sorted by the graph. The numbering is a *consequence* of the graph, not a record of it, and it survives only as long as nobody reasons from it.
+- **An agent reading only its own child issue cannot see what must land first.** A child that looks self-contained may not be, and its body will never say otherwise. Nothing about that is a bug to route around; the dependency was never written there.
+
+So recover the graph from the one place it survives: the parent's `todo` planning doc, read with `list_planning_docs(parent)`. **This is not a fallback for when ordering goes wrong — it is a step of the run.** It is the same call the count reconciliation above already makes, so read the document once and use it for both: the task count checks the enumeration, and the task list carries the order and the reason for it.
+
+Match each task to its child **by title**: the child's title is the task's title verbatim. Where the plan was written with the `flowly-plan` skill, each dependency is also stated in the dependent task's own prose, naming the other task by title, because a number would have dangled. Match on titles and read the prose; do not depend on the document's markdown shape, which the server owns and changes on its own schedule.
 
 ## Status Transitions
 
-Issue status is a closed set of six values — `triage`, `backlog`, `todo`, `in_progress`, `done`, `canceled` — and `update_issue(identifier, status=…)` writes it. Converted children arrive as `backlog`, priority 0, unassigned.
+Issue status is a closed set of six values — `triage`, `backlog`, `todo`, `in_progress`, `done`, `canceled` — and `update_issue(identifier, status=…)` is the only call in this loop that writes one. Converted children arrive as `backlog`, priority 0, unassigned.
 
-| moment | write |
+**Of the six, this loop writes two.**
+
+| transition | when | |
+|---|---|---|
+| `backlog → in_progress` | before the first line of code for that child | required |
+| `in_progress → done` | the child's acceptance holds **and** its commit exists | required |
+| `backlog → todo` | this run has claimed a child it has not started yet | optional, a queue marker only |
+
+The other three values are not this loop's to write, and each is refused for its own reason:
+
+| value | why not |
 |---|---|
-| this run intends to take a child (optional queue marking) | `backlog → todo` |
-| work on a child starts, before any code | `backlog → in_progress` |
-| the child's acceptance is met **and** its commit exists | `in_progress → done` |
-| the plan turned out not to need this child | `→ canceled`, with a comment saying why |
+| `triage` | upstream of the backlog — where work sits before anyone has decided on it. A converted child was decided on when a human approved the plan. Writing it back to `triage` un-decides that approval. |
+| `backlog` | where conversion put the child. Writing it back erases the only record that a run started on it, and that record is what a resume reads. |
+| `canceled` | **not the agent's to write on its own judgement.** Dropping a child changes the shape of the plan a human approved, so the decision is theirs. Write `canceled` only to carry out a decision a human has already recorded on the issue, and `add_comment` beside it naming whose decision it was. Otherwise stop the run, report, and leave the child where it is. |
+
+The `canceled` rule needs stating precisely because nothing enforces it: `update_issue` accepts all six values and will write `canceled` without complaint. There is no server-side refusal to fall back on, so the restraint has to be the agent's.
 
 Supporting calls: `assign_issue` to put a child on an actor, `whoami` to learn which actor this agent is, `list_issues(assignee="me")` to narrow a listing to that actor's work, `add_comment` to record anything a status cannot carry.
 
-Review verdicts are not statuses. There is no `approved` issue status; approval lives on the parent's plan gate and nowhere else.
+Review verdicts are not statuses. There is no `approved` issue status and no `in_review` issue status — those are review states, on a different field. Approval of the plan lives on the parent's plan gate, the verdict on built work lives on the loop run, and `update_issue` reaches neither.
 
 ## The Loop
 
@@ -104,7 +124,7 @@ Review verdicts are not statuses. There is no `approved` issue status; approval 
 7. `update_issue(child, status="done")` — only once the commit exists.
 8. Return to step 1.
 
-One commit per child, containing only that child's work, is what makes each child a clean rollback point. Two children in one commit collapses two rollback points into none.
+One commit per child, containing only that child's work, is what makes each child a clean rollback point. Two children in one commit collapses two rollback points into none. At every moment in that cycle exactly one child is in flight — the queue is walked, not fanned out.
 
 ### Stopping
 
@@ -121,7 +141,7 @@ Stop early, without starting the next child, when any of these is true:
 
 On an early stop, leave the current child's status truthful — `in_progress` if work started — and `add_comment` on it saying where the run stopped and why. A silent stop leaves the next run a child it cannot interpret.
 
-Collecting an evidence packet is the verify phase's artifact and belongs to that phase's command and skill. This loop commits; it does not attach evidence.
+Collecting an evidence packet is the verify phase's artifact and belongs to the `flowly-verify` skill. This loop commits; it does not attach evidence.
 
 ## Resuming
 
@@ -140,7 +160,9 @@ Re-invoking the command re-derives position from the tracker. There is no checkl
 | "There's no spec file, so there's nothing to check" | The precondition is the parent's review state, not a file. No file on disk ever grants or withholds it. |
 | "The plan is obviously fine, the gate is a formality" | Only a human reaches `approved`, and there is no argument that skips it. If it is not approved, this loop does not start. |
 | "27 children came back, so there are 27 children" | The window is 250, newest first, and truncation is silent. Reconcile the count against the parent's task list before trusting it. |
-| "The child's body lists no dependencies, so it has none" | The body omits them by design. The graph is in the parent's `todo` doc; match tasks to children by title. |
+| "The child's body lists no dependencies, so it has none" | The body never carried them — `depends_on` sorted the children and stopped there. The graph survives only in the parent's `todo` doc; read it and match tasks to children by title. |
+| "Ascending number is the dependency order, so I don't need the parent's doc" | Ascending number is only *valid because* conversion sorted by the graph. Reading the doc is what tells you that, and it is the same call the count check already makes. |
+| "Two of these children are independent, I'll do them together" | One child at a time. The child is the unit of status, commit and rollback; two in flight give you one commit spanning both and no way back to either. |
 | "There are a few unrelated edits in the tree, I'll commit everything" | That absorbs someone else's work into a child's commit and destroys the rollback point. Stop and hand the dirty tree back. |
 | "These two children are tiny, one commit is cleaner" | One commit per child is what makes each child revertible. Two in one is zero rollback points, not one. |
 | "I'll mark it done and fix the failing test in the next child" | `done` means the acceptance is met and the commit exists. Anything else makes the tracker lie to the next run. |
@@ -148,6 +170,8 @@ Re-invoking the command re-derives position from the tracker. There is no checkl
 | "This child is `in_progress`, a previous run must have just started it" | It may be half-implemented or half-committed. Read the child and the tree before touching it. |
 | "The child is trivial, I'll skip the status writes and do them at the end" | The status write is the resume record. Skipping it is how a crashed run comes back as an untouched-looking queue. |
 | "I'll set the child to `approved` when it passes" | Not a status. The six values are `triage`, `backlog`, `todo`, `in_progress`, `done`, `canceled`. |
+| "This child turned out to be unnecessary, I'll cancel it" | Dropping a child edits the plan a human approved. `update_issue` will write `canceled` without complaint, which is why the rule is here and not in the server. Stop and report; write it only on a human's recorded decision. |
+| "I finished the child, I'll set it back to `backlog` for review" | `backlog` is where conversion put it. Writing it back destroys the resume record. Built work is judged on the loop run, not by moving an issue backwards. |
 
 ## Red Flags
 
@@ -157,6 +181,10 @@ Re-invoking the command re-derives position from the tracker. There is no checkl
 - Implementation starting while the parent's review state is anything but `approved`
 - A search of the working tree for a specification, plan or charter file before building
 - Dependency order inferred from a child issue's body
+- The parent's `todo` doc never read, or read only after a child failed
+- Two children in flight at once
+- A child moved to `canceled` on the agent's own judgement
+- A child written back to `backlog` or `triage`
 - A stage-everything commit, or one commit spanning two children
 - A child moved to `done` with its verification unrun, failing, or unread
 - A child left in `backlog` while its code is being written
@@ -171,13 +199,15 @@ Before the first child:
 
 - [ ] `get_review(parent)` reports `approved`
 - [ ] Children were enumerated by listing the parent's project and filtering on parent id
-- [ ] The child count reconciles with the number of tasks in the parent's `todo` doc
-- [ ] The queue is sorted by issue number, ascending
+- [ ] The parent's `todo` doc was read, and its tasks matched to children by title
+- [ ] The child count reconciles with the number of tasks in that doc
+- [ ] The queue is sorted by issue number, ascending, and the doc confirms that order is the dependency order
 - [ ] The working tree is clean, with nothing uncommitted carried into the run
 - [ ] Any child already in `in_progress` has been read and accounted for
 
 For each child, before moving on:
 
+- [ ] It is the only child in flight
 - [ ] Its status was set to `in_progress` before any code was written
 - [ ] Its acceptance and verification were read from the issue itself
 - [ ] Its verification was run and the output observed
@@ -187,11 +217,14 @@ For each child, before moving on:
 Before the run stops:
 
 - [ ] Every child is `done` or `canceled`, or the stop condition is named
+- [ ] Any `canceled` child names the human decision it carries out
 - [ ] No child is left in `in_progress` without a comment saying where it stopped
 - [ ] Nothing was written to the working tree except code and its tests
 
 ## See Also
 
-The `flowly-plan` skill — how the plan, the task list and the gate that precedes this loop are written, and why nothing lands on disk.
+The `flowly-plan` skill — how the plan, the task list and the gate that precedes this loop are written, why `depends_on` orders the children without reaching them, and why nothing lands on disk.
+
+The `flowly-verify` skill — where the diff, the test output and the log this loop produced are attached, once the children are done. That packet hangs off a loop run; this loop's artifact is the commits.
 
 The `incremental-implementation` skill and the `test-driven-development` skill — the inner loop inside step 4 of each child. When a child's verification fails for reasons the child does not explain, the `debugging-and-error-recovery` skill applies before any status is written.

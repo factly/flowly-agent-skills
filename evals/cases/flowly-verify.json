@@ -1,0 +1,44 @@
+{
+  "skill_name": "flowly-verify",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Attach the diff and the test output to FLO-1204's Flowly loop run as its evidence packet",
+        "top_k": 3
+      },
+      {
+        "prompt": "The children are all done — put the evidence on this Flowly run before a human reviews it",
+        "top_k": 3
+      },
+      {
+        "prompt": "How should I attach evidence to a Flowly loop run without blowing past the packet cap?",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Write a failing test first, then the smallest change that makes it pass",
+        "owner": "test-driven-development"
+      },
+      {
+        "prompt": "The suite broke after my last change — find the root cause",
+        "owner": "debugging-and-error-recovery"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "I've finished the work. Write up what I did so the reviewer can approve it.",
+      "expected_output": "A request for the Flowly loop run, and a packet of few substantial items rather than a written summary",
+      "expectations": [
+        "The agent asks which Flowly loop run the evidence belongs to, or how to find it, instead of assuming one",
+        "The agent proposes attaching the diff and the verification output themselves, not a prose account of them",
+        "The agent does not offer a write-up as a substitute for the diff and the test output",
+        "Evidence is described as a few substantial items because the packet caps on item count rather than size",
+        "The agent does not claim it can approve the run, and stops at handing it to a human"
+      ]
+    }
+  ]
+}
