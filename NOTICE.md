@@ -51,6 +51,14 @@ skill frontmatter limited to `name` and `description`.
 `plugin.json` at the repository root was Antigravity's plugin manifest — the counterpart to the
 marketplace manifest above — and was removed with it.
 
+`.claude/commands/` — upstream's eight Claude Code slash commands — went later, not at import, when
+this fork's own six were authored at `commands/`. It is recorded here anyway, because this is the
+section a reader checks to find out what became of upstream's commands: they were replaced, not
+migrated. Nothing was carried across. The plugin had already stopped declaring that directory, so the
+files reached no user; what they still did was load as *project* commands for anyone working in this
+repository, under names that collided with ours and pointing at a plugin namespace that no longer
+exists.
+
 ## Surviving references to upstream
 
 Upstream's *identity* is stripped: no hero image, no badge, no maintainer table, no install line
@@ -87,9 +95,10 @@ here is not an oversight: `scripts/`, `docs/`, `evals/`, `hooks/`, `.github/`, `
 fork infrastructure — tooling, CI and prose we maintain outright — and tracking them row by row would
 make the register churn on work that has nothing to do with a merge.
 
-`commands/` contributes no rows. Upstream's Antigravity commands were removed at import (above) and
-git does not track empty directories, so the path does not exist in the tree yet. This fork's own
-lifecycle commands are authored later, and will be registered as `new`.
+`commands/` holds this fork's own lifecycle commands, all `new`. Upstream's Antigravity commands were
+removed from that path at import (above) and upstream's Claude Code commands lived at
+`.claude/commands/`, which is gone too — so nothing here descends from anything upstream ships, and a
+merge conflict in this directory means upstream has started using a path we took over.
 
 ### Statuses
 
@@ -114,6 +123,12 @@ still be byte-identical to the base. Nothing inherited has been edited in place 
 | `agents/security-auditor.md` | `unchanged` |
 | `agents/test-engineer.md` | `unchanged` |
 | `agents/web-performance-auditor.md` | `unchanged` |
+| `commands/build.md` | `new` |
+| `commands/plan.md` | `new` |
+| `commands/research.md` | `new` |
+| `commands/review.md` | `new` |
+| `commands/ship.md` | `new` |
+| `commands/test.md` | `new` |
 | `references/accessibility-checklist.md` | `unchanged` |
 | `references/definition-of-done.md` | `unchanged` |
 | `references/observability-checklist.md` | `unchanged` |

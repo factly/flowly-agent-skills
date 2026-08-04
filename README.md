@@ -22,10 +22,13 @@ This distribution is **under construction and not yet announced**. What is here 
 inherited corpus — 24 skills, 4 agent personas, 7 reference checklists — plus the structural gates
 that everything authored afterwards has to pass.
 
-**No slash commands ship yet.** The lifecycle commands that are the point of this fork — each taking
-a Flowly issue identifier, so that `/flowly:plan FLO-1234` writes that issue's planning docs through
-Flowly's MCP surface rather than to a local file — are authored next. Until then the plugin declares
-no command directory and installs 24 skills.
+**The six lifecycle commands ship.** `/flowly:research`, `/flowly:plan`, `/flowly:build`,
+`/flowly:test`, `/flowly:review` and `/flowly:ship` each take a Flowly issue identifier, so that
+`/flowly:plan FLO-1234` writes that issue's planning docs through Flowly's MCP surface rather than
+to a local file. Each resolves the identifier before it does anything else, and refuses to proceed
+without one instead of falling back to a local file. The Flowly-native skills they invoke are still
+landing: `scripts/check-commands.js` holds the list of the ones that do not exist yet, and goes red
+when one of them does.
 
 There is no semver contract. The manifests carry `0.1.0` because the plugin validator requires a
 version, not because anything is promised about compatibility.
@@ -72,9 +75,9 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 24 Skills
+## All 25 Skills
 
-The pack includes 24 skills total — 23 lifecycle skills plus the `using-agent-skills` meta-skill. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 25 skills total — 24 lifecycle skills plus the `using-agent-skills` meta-skill. One of them, `flowly-plan`, is ours; the rest are inherited. The Flowly-native set grows as the remaining phases land. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 ### Meta - Discover which skill applies
 
@@ -94,6 +97,7 @@ The pack includes 24 skills total — 23 lifecycle skills plus the `using-agent-
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
+| [flowly-plan](skills/flowly-plan/SKILL.md) | Write an issue's four planning docs and its task list through Flowly's tools, then hand the plan to the human gate | You have a Flowly issue identifier and work under it that needs breaking down |
 | [planning-and-task-breakdown](skills/planning-and-task-breakdown/SKILL.md) | Decompose specs into small, verifiable tasks with acceptance criteria and dependency ordering | You have a spec and need implementable units |
 
 ### Build - Write the code
@@ -204,36 +208,37 @@ Every skill follows a consistent anatomy:
 
 ```
 flowly-agent-skills/
-├── skills/                            # 24 skills (23 lifecycle + 1 meta)
+├── skills/                            # 25 skills (24 lifecycle + 1 meta)
 ├── agents/                            # 4 specialist personas
 ├── references/                        # 7 supplementary checklists
-├── commands/                          # reserved: this fork's lifecycle commands
+├── commands/                          # the 6 lifecycle commands, each taking an issue identifier
 ├── hooks/                             # session lifecycle hooks
 ├── evals/                             # skill eval cases + framework
 ├── scripts/                           # the structural gates (see below)
 ├── docs/                              # format spec, adoption, onboarding
 ├── .claude-plugin/                    # marketplace.json + plugin.json
 ├── .codex-plugin/                     # Codex manifest — door kept openable, undocumented
-├── .claude/commands/                  # inherited commands, no longer declared by the plugin
 ├── LICENSE                            # MIT — upstream's copyright and ours
 └── NOTICE.md                          # derivation, base SHA, and the ownership register
 ```
 
-The plugin manifest declares `skills` and deliberately declares **no** command directory: declaring
-`commands` *replaces* Claude Code's default scan rather than adding to it, so authoring at the
-default path and staying silent is what keeps both working.
+The plugin manifest declares `skills` and deliberately declares **no** `commands` key. Declaring one
+*replaces* Claude Code's default scan rather than adding to it — and that default scan reads
+`<plugin-root>/commands/`, which is where the six live. Staying silent in the manifest is what
+registers them.
 
 ---
 
 ## Checks
 
-Four gates run over this repository. Each one has a mutation that turns it red, which is the only
+Five gates run over this repository. Each one has a mutation that turns it red, which is the only
 reason to believe it works:
 
 | Check | Asserts | Turns red when |
 |---|---|---|
 | `node scripts/validate-skills.js` | Frontmatter, description trigger and length, required sections, `name` matches the directory | A required section is deleted |
 | `./scripts/validate-standard.sh` | Frontmatter carries exactly `name` and `description` | Any third key is added |
+| `node scripts/check-commands.js` | Exactly six commands, each with a description, no substitution token in any body, the identifier-resolution block verbatim in all six, every named skill resolving, and a rendered size under Codex's migration cap | A substitution token is added to a command body |
 | `node scripts/check-no-hosts.js` | No hostname outside a curated allowlist, and no absolute workspace path, anywhere in the tree | Any new hostname appears |
 | `node scripts/check-register.js` | Every shipped file is registered exactly once, the base SHA is an ancestor of `HEAD`, and every `unchanged` file really is byte-identical to it | A file is added without a register row |
 
