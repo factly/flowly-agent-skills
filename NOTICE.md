@@ -164,8 +164,10 @@ carried would have been an unverified claim.
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
 | `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-connect/SKILL.md` | `new` |
+| `skills/flowly-define/SKILL.md` | `new` |
 | `skills/flowly-plan/SKILL.md` | `new` |
 | `skills/flowly-plan/references/planning-docs.md` | `new` |
+| `skills/flowly-plan-gate/SKILL.md` | `new` |
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
 | `skills/git-workflow-and-versioning/SKILL.md` | `bound` |
 | `skills/idea-refine/SKILL.md` | `bound` |

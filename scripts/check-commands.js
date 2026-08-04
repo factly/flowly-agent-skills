@@ -94,8 +94,6 @@ const MAX_MIGRATED_BYTES = 4000;
 // entry to be deleted. An exemption that can only be removed by a human who
 // happens to remember it is an exemption that becomes permanent.
 const PLANNED_SKILLS = new Map([
-  ['flowly-define',    'the Define phase skill, authored in the Flowly-native skills phase'],
-  ['flowly-plan-gate', 'the plan-gate skill, authored in the Flowly-native skills phase'],
   ['flowly-verify',    'the Verify phase skill, authored in the Flowly-native skills phase'],
   ['flowly-review',    'the Review phase skill, authored in the Flowly-native skills phase'],
   ['flowly-ship',      'the Ship phase skill, authored in the Flowly-native skills phase'],

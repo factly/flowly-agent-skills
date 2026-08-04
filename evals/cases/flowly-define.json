@@ -1,0 +1,43 @@
+{
+  "skill_name": "flowly-define",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Find the Flowly issue for the saved-filters work, or file one if it doesn't exist, then write up what you find in its research doc",
+        "top_k": 3
+      },
+      {
+        "prompt": "FLO-19 is sitting in triage — accept it and start reading up on it",
+        "top_k": 3
+      },
+      {
+        "prompt": "Read the project's shared assets in Flowly and record what the export code does today on FLO-773",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "Write a specification for the new billing export before anyone writes code",
+        "owner": "spec-driven-development"
+      },
+      {
+        "prompt": "Review the pull request diff for security problems before it merges",
+        "owner": "code-review-and-quality"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Before we plan this, write up a charter for the repo covering our six core areas so every future plan inherits it.",
+      "expected_output": "A refusal to store a repository-wide charter as a planning doc, with the material routed to where Flowly actually holds it",
+      "expectations": [
+        "The agent states that the planning doc kind is a closed set of four — research, plan, todo, risks — with no kind for a repository-wide document",
+        "The agent does not write the charter into the research doc, and says the tool would accept it without validating it",
+        "Project-wide conventions are directed to the project's assets, read with get_project_assets, rather than to a planning doc",
+        "No charter, constitution, or principles file is created in the working tree"
+      ]
+    }
+  ]
+}
