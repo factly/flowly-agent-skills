@@ -81,11 +81,23 @@ jobs:
       # docs/install.md § Doors kept openable.
       #
       # The script also accepts `--reference`, which drives the standard's own
-      # pinned reference validator over every skill via npx. It is not run here:
-      # the script's own header argues that an npm download does not belong on
-      # the critical path of a check that must work on a public repository's
-      # first commit. Turning it on is a decision to take on purpose, not a line
-      # to add quietly.
+      # pinned reference validator (`skills-ref@0.1.5`) over every skill via npx.
+      # It stays off here, and the reason is stronger than the npm download:
+      #
+      # `skills-ref` enforces the SPEC's six-field frontmatter set. This fork
+      # holds a two-field intersection, because two is what loads on every door.
+      # So the reference validator CANNOT enforce the rule this gate exists to
+      # enforce. Measured both ways: `allowed-tools: Bash` added to a SKILL.md is
+      # a legal spec field that skills-ref exits 0 on, and that this script
+      # rejects — verified against the current corpus at `1 violation(s) —
+      # FAILED`. Its own README also states it is for demonstration and not
+      # production.
+      #
+      # It stays wired as an opt-in flag rather than deleted, because "every
+      # skill is valid under the open standard" is a claim about a corpus that
+      # grows, and a claim nothing can re-check is a claim that rots. Run it by
+      # hand when the spec moves; do not put it on the critical path of a check
+      # that must work on a public repository's first commit.
       - name: Every skill is valid under the open standard, two fields only
         run: bash scripts/validate-standard.sh
 
@@ -317,12 +329,33 @@ jobs:
       # additionally turns warnings, such as an unknown field, into errors; a
       # warning-only run under --strict was probed exiting 1 too.
       #
-      # WHAT IT DOES NOT COVER: pointed at .claude-plugin/plugin.json directly,
-      # `validate` additionally scans the plugin TREE, and that form exits 1
-      # today over a warning about CLAUDE.md at the plugin root. Adding it here
-      # would mean deciding what happens to CLAUDE.md, which is a repository
-      # decision and not this workflow's to take. It is named rather than
-      # omitted so the next reader knows the gap is known.
+      # THE TREE-SCANNING FORM IS DELIBERATELY NOT RUN, AND NOT BECAUSE IT IS RED
+      #
+      # Pointed at .claude-plugin/plugin.json directly, `validate` also scans the
+      # plugin TREE. That form exits 1 under --strict on this repository, over:
+      #
+      #   ⚠ root: CLAUDE.md at the plugin root is not loaded as project context.
+      #     To ship context with your plugin, use a skill instead.
+      #
+      # The warning's premise is that a CLAUDE.md at the plugin root was MEANT to
+      # ship as context to plugin users. Ours was not, and says so in its own
+      # second paragraph: it configures agents working on this repository. So the
+      # finding is a false positive here, and the fix it proposes — move the
+      # content into a skill — would ship our contributor guide to every user of
+      # the plugin.
+      #
+      # That alone would argue for running it non-strict. Measured, it does not
+      # even earn that. Against claude 2.1.220, with a skill's frontmatter
+      # REMOVED ENTIRELY:
+      #
+      #     node scripts/validate-skills.js                     exit 1  ← ours
+      #     claude plugin validate --strict .                   exit 0
+      #     claude plugin validate .claude-plugin/plugin.json   exit 0  ← tree scan
+      #
+      # A name that no longer matches its directory passes both forms too. The
+      # tree scan finds nothing our own linter does not, and its only output on
+      # this repository is the false positive above. It is not a gap; it is a
+      # check that would add a permanent exemption and no coverage.
       - name: Marketplace and plugin manifests validate with warnings fatal
         run: claude plugin validate --strict .
 
