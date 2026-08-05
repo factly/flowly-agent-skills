@@ -74,7 +74,7 @@ was never here", so upstream will offer it back on the next sync, and the answer
 
 The answer is no because the file's entire content was a claim about a catalog that is not ours. It
 enumerated 24 skills in a routing flowchart, a lifecycle sequence and a quick-reference table; this
-fork ships 33, nine of them Flowly-native, arranged around six phases and a tracker upstream knows
+fork ships 33, ten of them Flowly-native, arranged around six phases and a tracker upstream knows
 nothing about. Merging its updates would import a router that sends agents to skills this
 distribution does not have — the one failure a router is there to prevent — and the merge would look
 clean while doing it. So the path is not `owned` and re-bound; it is gone, and the replacement is
@@ -225,7 +225,7 @@ about command names and nothing else — but the binding no longer rests entirel
 | `skills/frontend-ui-engineering/SKILL.md` | `unchanged` |
 | `skills/git-workflow-and-versioning/SKILL.md` | `bound` |
 | `skills/idea-refine/SKILL.md` | `bound` |
-| `skills/idea-refine/examples.md` | `unchanged` |
+| `skills/idea-refine/examples.md` | `bound` |
 | `skills/idea-refine/frameworks.md` | `unchanged` |
 | `skills/idea-refine/refinement-criteria.md` | `unchanged` |
 | `skills/incremental-implementation/SKILL.md` | `unchanged` |

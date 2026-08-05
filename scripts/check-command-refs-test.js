@@ -139,6 +139,46 @@ test('a tagged fence is code, and its regex literals are not commands', () => {
   assert.deepEqual(refs(plain), ['/log']);
 });
 
+test('a backticked command inside a tagged fence is still code', () => {
+  // The case above has no backticks in it, so it only proves the fence skip
+  // beats the whitespace-token path. This one proves it also beats the inline
+  // span path — the branch that runs on every ordinary prose line.
+  const line = '// see `/flowly:review` for the rubric';
+  const code = ['```typescript', line, '```'].join('\n');
+
+  assert.deepEqual(refs(code), []);
+  // The control is the same line OUTSIDE a fence, not inside an untagged one:
+  // the untagged branch splits raw text on whitespace, so there the token still
+  // carries its backticks and matches nothing. Prose is where this line's
+  // reference is real, and prose is what the tagged fence has to beat.
+  assert.deepEqual(refs(line), ['/flowly:review']);
+});
+
+// ─── Extraction: a span holds tokens, not one reference ──────────────────────
+
+test('extracts a command written with its argument', () => {
+  // Taking an issue identifier IS this product, so `/flowly:plan FLO-1234` is
+  // the canonical way its own docs write a command. Testing the whole span
+  // body against an anchored pattern meant every one of them was invisible.
+  assert.deepEqual(refs('Run `/flowly:plan FLO-1234` to start.'), ['/flowly:plan']);
+  assert.deepEqual(refs('Run `/flowly:build auto FLO-1234` to finish.'), ['/flowly:build']);
+});
+
+test('extracts every command in a lifecycle sequence', () => {
+  // How a doc writes the lifecycle. Two dead commands survived a check written
+  // to find them because this shape extracted nothing at all.
+  assert.deepEqual(
+    refs('Steady state: `/flowly:research → /flowly:plan → /flowly:build`.'),
+    ['/flowly:research', '/flowly:plan', '/flowly:build'],
+  );
+});
+
+test('a span of ordinary prose or a path is still not a command', () => {
+  assert.deepEqual(refs('Set `--min-rank1 80` in CI.'), []);
+  assert.deepEqual(refs('See `docs/skill-anatomy.md` and `scripts/run-evals.js`.'), []);
+  assert.deepEqual(refs('Run `cd /usr/local/bin && ls`.'), []);
+});
+
 test('a fence closes, and text after it is read as prose again', () => {
   const text = ['```typescript', 'const x = 1;', '```', 'Then run `/flowly:ship`.'].join('\n');
 

@@ -140,14 +140,15 @@
  * they are what an agent reads mid-run. The root files are what a human reads
  * before typing anything.
  *
- * `docs/` is NOT scanned, and it is not clean: measured at authoring time it
- * carries `/build`, `/plan`, `/review`, `/ship`, `/spec`, `/test`,
- * `/code-simplify`, `/webperf` and `/work-on-pr` across five files. That is a
- * real bug and a different task's — the same split `check-tool-drift.js` makes
- * for the same reason. A stale command name in a shipped skill is acted on by an
- * agent mid-run; a stale one in `docs/` misleads a reader, which is a lesser
- * harm at a different moment. Naming the gap here rather than omitting it is the
- * point: the next reader should know it is known.
+ * `docs/` IS scanned, via PROSE_TREES. It was not, when this header was first
+ * written: the gap was recorded here as a known bug for a different task, and
+ * then that task closed it. The paragraph outlived its own subject by a phase,
+ * which is the failure mode the scan itself exists to catch — a claim about the
+ * corpus that nothing re-checks. It is rewritten rather than deleted so the next
+ * reader can see that the split was considered and then abandoned: a stale
+ * command in `docs/` misleads a human at a calmer moment than one in a shipped
+ * skill misleads an agent mid-run, but both are wrong and neither is expensive
+ * to check.
  *
  * Usage:
  *   node scripts/check-command-refs.js
@@ -279,8 +280,21 @@ function extractCommandRefs(text) {
     }
 
     for (const span of lines[i].matchAll(INLINE_SPAN_RE)) {
-      const body = span[2].trim();
-      if (COMMAND_REF_RE.test(body)) found.push({ ref: body, line: i + 1 });
+      // Tokenised, not tested whole. Matching the entire span body against an
+      // anchored pattern meant a span held at most one reference, and the two
+      // shapes that escaped are the two this corpus writes most:
+      //
+      //     `/flowly:plan FLO-1234`        a command with its argument — and
+      //                                    taking an argument is this product
+      //     `/spec → /plan → /build`       a lifecycle sequence
+      //
+      // Both read as command references to every human and were invisible here,
+      // which is how two dead commands survived a check written to find them.
+      // Splitting on the same delimiters as the untagged-fence branch above
+      // keeps one definition of "a token" for both.
+      for (const token of span[2].trim().split(/[\s,;]+/)) {
+        if (COMMAND_REF_RE.test(token)) found.push({ ref: token, line: i + 1 });
+      }
     }
   }
 
