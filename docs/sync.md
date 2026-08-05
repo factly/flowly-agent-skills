@@ -239,7 +239,7 @@ DU skills/using-agent-skills/SKILL.md
 - **`unchanged` merged clean.** `skills/test-driven-development/SKILL.md` took upstream's added line
   with no conflict and no human judgement, as it should.
 - **`bound` conflicted, and the hunk was the exact silent failure § Resolving a conflict warns about.**
-  Upstream's side restored *"Save the plan to `tasks/plan.md` … per the `/plan` command convention"*
+  Upstream's side restored *"Save the plan to `tasks/plan.md` … Create the `tasks/` directory"*
   over our *"The plan and the task list belong to the Flowly issue … `put_planning_doc`"*. Accepting
   it would have reverted the binding, produced no error anywhere, and left the skill telling agents to
   write a file nothing in this distribution reads. Resolved by keeping ours.

@@ -136,7 +136,7 @@ const ALLOWED_MENTIONS = [
   },
   {
     file: 'docs/sync.md',
-    line: 'Upstream\'s side restored *"Save the plan to `tasks/plan.md` … per the `/plan` command convention"*',
+    line: 'Upstream\'s side restored *"Save the plan to `tasks/plan.md` … Create the `tasks/` directory"*',
     reason:
       'the sync rehearsal record quoting the upstream hunk it rejected — a resolver has to be able to recognise the reverting text on sight, and this check is the reason it was caught',
   },

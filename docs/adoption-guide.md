@@ -65,7 +65,7 @@ Run the lifecycle in order for the project's first real feature:
 
 ### Greenfield anti-patterns
 
-- **Skipping `/spec` because "it's just a prototype."** Prototypes become products. The spec is the cheapest artifact you'll ever write for this codebase.
+- **Skipping `/flowly:research` because "it's just a prototype."** Prototypes become products. The spec is the cheapest artifact you'll ever write for this codebase.
 - **Loading every skill in the pack into every session.** It wastes context and dilutes the ones that matter. Load by phase; let `flowly-catalog` route.
 - **Deferring observability until "there's something to observe."** Instrument as you build, retrofitting structured logging is a Path B problem you're choosing to create.
 
@@ -122,7 +122,7 @@ Both end in the same steady state: `/spec → /plan → /build → /review → /
 
 |                        | Greenfield                     | Brownfield                               |
 | ---------------------- | ------------------------------ | ---------------------------------------- |
-| First skill loaded     | `flowly-catalog` + `/spec`     | `context-engineering`                    |
+| First skill loaded     | `flowly-catalog` + `/flowly:research` | `context-engineering`             |
 | First value delivered  | Spec'd, tested first feature   | Zero-risk reviews and safer bug fixes    |
 | TDD posture            | Universal from commit one      | Selective: tests where change is planned |
 | Refactoring rule       | Rare (little to refactor)      | Characterization tests first, always     |

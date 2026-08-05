@@ -194,7 +194,7 @@ jobs:
       - name: The catalog checker works
         run: node --test scripts/check-catalog-test.js
 
-      - name: The catalog and the skills tree are the same set, both directions
+      - name: Every hand-maintained list of skills matches the tree, both directions
         run: node scripts/check-catalog.js
 
   commands:
@@ -211,6 +211,30 @@ jobs:
       # substitution token in any command body. See docs/install.md.
       - name: Six commands, no substitution tokens, every named skill resolves
         run: node scripts/check-commands.js
+
+  command-refs:
+    name: Command references
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The checker first, then its verdict. A broken checker's green is not
+      # evidence about the corpus.
+      - name: The reference checker works
+        run: node --test scripts/check-command-refs-test.js
+
+      # The mirror image of the `commands` job above. That one looks outward
+      # from `commands/` and validates each command against the skills it names.
+      # This one looks the other way — at everything that tells a reader which
+      # command to type — and it is the gate that turns an upstream merge
+      # reinstating a bare, un-namespaced command name into a red run instead of
+      # a hunk somebody has to notice. See NOTICE.md § Statuses.
+      - name: Every /command written in the shipped corpus resolves to one on disk
+        run: node scripts/check-command-refs.js
 
   tool-drift:
     name: Tool drift
@@ -362,6 +386,7 @@ jobs:
       - register
       - catalog
       - commands
+      - command-refs
       - tool-drift
       - evals
       - hooks

@@ -152,14 +152,25 @@ that was *meant* to be rebound and never was reads as finished. Until the first 
 there were no `bound` rows, and the reverse assertion did not exist — every row that word could have
 carried would have been an unverified claim.
 
+Some of that cost is bought back by a check, and it is worth saying which. Six of the rows below
+were bound because they named a *command*: they told a reader to type `review`, `ship`, `test` —
+bare, without the `flowly:` namespace a user actually has to type — or `webperf`, which this
+distribution does not ship in any spelling. Upstream writes those names because upstream ships those
+commands, so every merge would have offered them back, and there was no reader to notice.
+`scripts/check-command-refs.js` is that reader: it resolves every command written anywhere in the
+four trees above or in the root prose against `commands/` on disk, and it fails on a bare name as
+loudly as on a missing one. So for these six, a merge that reverts the binding is now an automated
+red rather than something a human has to catch. `bound` still means read the hunk — the check knows
+about command names and nothing else — but the binding no longer rests entirely on the reading.
+
 ### Files
 
 | File | Status |
 |---|---|
-| `agents/code-reviewer.md` | `unchanged` |
-| `agents/security-auditor.md` | `unchanged` |
-| `agents/test-engineer.md` | `unchanged` |
-| `agents/web-performance-auditor.md` | `unchanged` |
+| `agents/code-reviewer.md` | `bound` |
+| `agents/security-auditor.md` | `bound` |
+| `agents/test-engineer.md` | `bound` |
+| `agents/web-performance-auditor.md` | `bound` |
 | `commands/build.md` | `new` |
 | `commands/plan.md` | `new` |
 | `commands/research.md` | `new` |
@@ -169,7 +180,7 @@ carried would have been an unverified claim.
 | `references/accessibility-checklist.md` | `unchanged` |
 | `references/definition-of-done.md` | `unchanged` |
 | `references/observability-checklist.md` | `unchanged` |
-| `references/orchestration-patterns.md` | `unchanged` |
+| `references/orchestration-patterns.md` | `bound` |
 | `references/performance-checklist.md` | `unchanged` |
 | `references/security-checklist.md` | `unchanged` |
 | `references/testing-patterns.md` | `unchanged` |
@@ -182,7 +193,7 @@ carried would have been an unverified claim.
 | `skills/debugging-and-error-recovery/SKILL.md` | `unchanged` |
 | `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
 | `skills/documentation-and-adrs/SKILL.md` | `bound` |
-| `skills/doubt-driven-development/SKILL.md` | `unchanged` |
+| `skills/doubt-driven-development/SKILL.md` | `bound` |
 | `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-catalog/SKILL.md` | `new` |
 | `skills/flowly-connect/SKILL.md` | `new` |

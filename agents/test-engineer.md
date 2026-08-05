@@ -91,5 +91,5 @@ When analyzing test coverage:
 ## Composition
 
 - **Invoke directly when:** the user asks for test design, coverage analysis, or a Prove-It test for a specific bug.
-- **Invoke via:** `/test` (TDD workflow) or `/ship` (parallel fan-out for coverage gap analysis alongside `code-reviewer` and `security-auditor`).
+- **Invoke via:** `/flowly:test` (TDD workflow) or `/flowly:ship` (parallel fan-out for coverage gap analysis alongside `code-reviewer` and `security-auditor`). Both take a Flowly issue identifier; the namespace is not optional, because these commands ship inside a plugin.
 - **Do not invoke from another persona.** Recommendations to add tests belong in your report; the user or a slash command decides when to act on them. See [docs/agents.md](../docs/agents.md).

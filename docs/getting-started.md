@@ -98,7 +98,7 @@ The `agents/` directory contains pre-configured agent personas:
 | `code-reviewer.md` | Five-axis code review |
 | `test-engineer.md` | Test strategy and writing |
 | `security-auditor.md` | Vulnerability detection |
-| `web-performance-auditor.md` | Core Web Vitals & performance audit (via `/webperf`) |
+| `web-performance-auditor.md` | Core Web Vitals & performance audit |
 
 Load an agent definition when you need specialized review. For example, ask your coding agent to "review this change using the code-reviewer agent persona" and provide the agent definition.
 
@@ -106,17 +106,23 @@ Load an agent definition when you need specialized review. For example, ask your
 
 The `commands/` directory contains slash commands for Claude Code:
 
+Every one of them takes a Flowly issue identifier and refuses to proceed without one.
+
 | Command | Skill Invoked |
 |---------|---------------|
-| `/spec` | spec-driven-development |
-| `/plan` | planning-and-task-breakdown |
-| `/build` | incremental-implementation + test-driven-development |
-| `/build auto` | planning-and-task-breakdown → incremental-implementation + test-driven-development (whole plan, one approval) |
-| `/test` | test-driven-development |
-| `/review` | code-review-and-quality |
-| `/code-simplify` | code-simplification |
-| `/ship` | shipping-and-launch |
-| `/webperf` | web-performance-auditor (specialist agent, web apps only) |
+| `/flowly:research` | spec-driven-development |
+| `/flowly:plan` | planning-and-task-breakdown + flowly-plan |
+| `/flowly:build` | incremental-implementation + test-driven-development + flowly-build |
+| `/flowly:test` | test-driven-development + flowly-verify |
+| `/flowly:review` | code-review-and-quality + flowly-review |
+| `/flowly:ship` | shipping-and-launch + flowly-ship |
+
+The mode word goes *before* the identifier, not after the command: `/flowly:build auto FLO-1234`
+works the whole plan in one pass.
+
+Two skills have no command of their own. `code-simplification` is reached from
+`/flowly:review`, and `web-performance-auditor` is a persona you ask for by agent type — this
+fork ships six commands and none of them is a performance audit.
 
 ## Using References
 
