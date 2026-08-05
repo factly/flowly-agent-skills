@@ -18,17 +18,26 @@ Skills activate automatically based on what you're doing — designing an API tr
 
 ## Status
 
-This distribution is **under construction and not yet announced**. What is here today is the
-inherited corpus — 23 skills, 4 agent personas, 7 reference checklists — plus the structural gates
-that everything authored afterwards has to pass.
+This distribution is **under construction and not yet announced**. What that means is narrower than
+it sounds: the repository has been public since its first commit, so announcing is the step that
+creates the first outside dependency, not a change of visibility. Nothing here is waiting to be
+written — every lifecycle phase has a Flowly-native skill, the inherited corpus points at the issue
+rather than at the filesystem, and a check asserts that on every change rather than trusting it.
 
 **The six lifecycle commands ship.** `/flowly:research`, `/flowly:plan`, `/flowly:build`,
 `/flowly:test`, `/flowly:review` and `/flowly:ship` each take a Flowly issue identifier, so that
 `/flowly:plan FLO-1234` writes that issue's planning docs through Flowly's MCP surface rather than
 to a local file. Each resolves the identifier before it does anything else, and refuses to proceed
-without one instead of falling back to a local file. The Flowly-native skills they invoke are still
-landing: `scripts/check-commands.js` holds the list of the ones that do not exist yet, and goes red
-when one of them does.
+without one instead of falling back to a local file.
+
+**Every skill those commands name now exists.** `scripts/check-commands.js` carried an exemption
+list for the ones that did not yet, and that list is now empty — each entry was deleted in the commit
+that made its skill real, because the check is red in both directions and an exemption for a skill
+that exists is an error. The emptiness is asserted, not claimed here; run the check.
+
+What is *not* done is listed in [`docs/install.md`](docs/install.md) and the sync procedure in
+[`docs/sync.md`](docs/sync.md): CI has never run, and no one outside this repository has followed the
+install guide on a machine that holds no credential for our GitHub org.
 
 There is no semver contract. The manifests carry `0.1.0` because the plugin validator requires a
 version, not because anything is promised about compatibility.
