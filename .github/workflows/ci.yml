@@ -128,6 +128,12 @@ jobs:
       # reaches a public commit cannot be withdrawn — not by a force-push, not
       # by making the repository private. Every other gate here guards something
       # recoverable; this one does not.
+      # The checker first, then its verdict. This gate guards the one mistake
+      # that cannot be undone, so its green has to mean something: a checker
+      # that reported nothing would pass this job every time.
+      - name: The host checker works
+        run: node --test scripts/check-no-hosts-test.js
+
       - name: Nothing host-shaped or user-path-shaped is about to be published
         run: node scripts/check-no-hosts.js
 

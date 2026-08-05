@@ -70,6 +70,16 @@ const path = require('path');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
+// `--root <dir>` scans another tree. Every sibling check here has this seam;
+// this one did not, and that is the whole reason it was the largest untested
+// script in the repo — there was no way to point it at a tree containing a
+// deliberate leak. A guard on a one-way door that cannot be exercised is a
+// guard nobody has watched work.
+function parseRoot(argv) {
+  const i = argv.indexOf('--root');
+  return i === -1 ? REPO_ROOT : path.resolve(argv[i + 1]);
+}
+
 // ─── Allowlist ───────────────────────────────────────────────────────────────
 //
 // Every entry is a host that is safe in a public commit. Grouped by WHY it is
@@ -227,6 +237,13 @@ const BARE_TOKEN_TLDS = new Set([
   'se', 'no', 'fi', 'dk', 'es', 'ch', 'at', 'be', 'nz', 'za', 'kr', 'ar',
   'cl', 'ie', 'pt', 'gr', 'cz', 'hu', 'ro', 'il', 'sg', 'hk', 'tw', 'th',
   'my', 'ph', 'vn', 'tr', 'ua', 'eu', 'tv', 'me', 'gg', 'fm', 'im', 'ws',
+  // internal-network suffixes. These are the canonical names for exactly the
+  // host this check exists to stop — a Flowly instance on a company network is
+  // far likelier to be `flowly.<company>.internal` than anything on a public
+  // TLD. They were missing while every public TLD was present, which inverted
+  // the list's own priority. None collides with a source-file extension, so
+  // the documented reason for the exclusions above does not reach them.
+  'internal', 'local', 'lan', 'intranet', 'corp', 'private',
 ]);
 
 const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
@@ -245,16 +262,49 @@ const BARE_RULE_SKIP_EXTENSIONS = new Set([
  * bare-token rule can be limited to prose. The fence line itself is included:
  * an info string such as ```bash is not prose either.
  */
+/**
+ * Fence languages where the bare-token rule KEEPS applying.
+ *
+ * Gate 1 masks fenced blocks because the false positives it was measured
+ * against were property accesses in program source — `<obj>.name`, `<logger>.
+ * info`. That reasoning is about a language, not about a fence: in a shell
+ * transcript or a config snippet, a dotted token ending in a network TLD is a
+ * hostname essentially every time, and dotted property access is not the idiom.
+ *
+ * It matters because these are the fences a setup guide is MADE of. The shape a
+ * real leak takes here is `export FLOWLY_HOST=…` or `host: …` in an install
+ * doc, and masking the whole block put the likeliest leak in the only place the
+ * bare rule could not see. Gate 2 still applies inside these blocks, so a token
+ * must still end in a curated network TLD to be reported at all.
+ */
+const SCANNED_FENCE_LANGUAGES = new Set([
+  'bash', 'sh', 'shell', 'zsh', 'console', 'shell-session', 'terminal',
+  'env', 'dotenv', 'properties',
+  'yaml', 'yml', 'toml', 'ini', 'conf', 'cfg', 'json', 'jsonc',
+  'http', 'nginx', 'docker', 'dockerfile', 'compose', 'makefile', 'make',
+]);
+
 function fencedLineSet(lines) {
   const fenced = new Set();
   let open = null;
+  let scanning = false;
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^\s*(`{3,}|~{3,})/);
+    const m = lines[i].match(/^\s*(`{3,}|~{3,})\s*([^\s`]*)/);
     if (open === null) {
-      if (m) { open = m[1][0].repeat(m[1].length); fenced.add(i); }
+      if (m) {
+        open = m[1][0].repeat(m[1].length);
+        // A config or shell block stays in scope for the bare rule; every
+        // other block, tagged or not, is masked as before.
+        scanning = SCANNED_FENCE_LANGUAGES.has(m[2].toLowerCase());
+        fenced.add(i);
+      }
     } else {
-      fenced.add(i);
-      if (m && m[1][0] === open[0] && m[1].length >= open.length) open = null;
+      if (!scanning) fenced.add(i);
+      if (m && m[1][0] === open[0] && m[1].length >= open.length) {
+        fenced.add(i);
+        open = null;
+        scanning = false;
+      }
     }
   }
   return fenced;
@@ -343,7 +393,31 @@ function findCandidates(line, applyBareRule) {
   }
 
   // ── 5. Absolute workspace paths ───────────────────────────────────────────
-  const pathRe = /(?:\/Users\/[A-Za-z0-9._-]+|\/home\/[A-Za-z0-9._-]+|[A-Za-z]:\\Users\\[A-Za-z0-9._-]+)/g;
+  //
+  // What leaks here is the USERNAME, so every prefix that precedes one belongs
+  // in the pattern, not just the two obvious ones:
+  //
+  //   /root/<dir>               the root account's tree
+  //   /Volumes/<vol>/<user>/    an external disk on macOS, where a checkout
+  //                             very plausibly lives
+  //   -Users-<user>-            the MANGLED form. Agent harnesses name their
+  //                             scratch directories by flattening a path's
+  //                             slashes to hyphens, so a pasted log line or
+  //                             temp path carries the username in a shape the
+  //                             slash-based patterns cannot see. This is the
+  //                             likeliest of the three to be produced by an
+  //                             agent writing docs, which is who writes here.
+  const pathRe = new RegExp(
+    [
+      '\\/Users\\/[A-Za-z0-9._-]+',
+      '\\/home\\/[A-Za-z0-9._-]+',
+      '\\/root\\/[A-Za-z0-9._-]+',
+      '\\/Volumes\\/[A-Za-z0-9._-]+\\/[A-Za-z0-9._-]+',
+      '[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+',
+      '-(?:Users|home)-[A-Za-z0-9._-]+-',
+    ].join('|'),
+    'g',
+  );
   while ((m = pathRe.exec(line)) !== null) {
     found.push({ text: m[0], host: null, kind: 'workspace path' });
   }
@@ -363,8 +437,8 @@ function findCandidates(line, applyBareRule) {
  * fails SAFE for this check, because under-matching an ignore rule means
  * scanning MORE files, never fewer.
  */
-function loadGitignore() {
-  const file = path.join(REPO_ROOT, '.gitignore');
+function loadGitignore(root) {
+  const file = path.join(root, '.gitignore');
   if (!fs.existsSync(file)) return [];
   return fs.readFileSync(file, 'utf8')
     .split('\n')
@@ -406,17 +480,17 @@ function isBinary(buf) {
   return false;
 }
 
-function walk(dir, rules, out, skipped) {
+function walk(dir, rules, out, skipped, root) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const abs = path.join(dir, entry.name);
-    const rel = path.relative(REPO_ROOT, abs).split(path.sep).join('/');
+    const rel = path.relative(root, abs).split(path.sep).join('/');
 
     if (entry.isSymbolicLink()) { skipped.symlinks.push(rel); continue; }
 
     if (entry.isDirectory()) {
       if (entry.name === '.git') { skipped.git = true; continue; }
       if (isIgnored(rel, true, rules)) { skipped.ignored.push(rel + '/'); continue; }
-      walk(abs, rules, out, skipped);
+      walk(abs, rules, out, skipped, root);
       continue;
     }
 
@@ -428,16 +502,29 @@ function walk(dir, rules, out, skipped) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-function main() {
-  const rules = loadGitignore();
+function main(argv = process.argv.slice(2)) {
+  const root = parseRoot(argv);
+  const rules = loadGitignore(root);
   const files = [];
   const skipped = { git: false, ignored: [], excluded: [], symlinks: [], binary: [] };
 
-  walk(REPO_ROOT, rules, files, skipped);
+  walk(root, rules, files, skipped, root);
   files.sort((a, b) => a.rel.localeCompare(b.rel));
 
   const violations = [];
   let scanned = 0;
+
+  // A walk that finds nothing satisfies every assertion below without making
+  // one. On a one-way door that is the worst possible way to report success,
+  // so say it plainly instead.
+  if (files.length === 0) {
+    console.log('✗  no files to scan — the walk found nothing, which is not the same as clean');
+    console.log('\n1 violation(s) — FAILED');
+    // process.exit, not `return`: main() is invoked bare at the bottom of this
+    // file and sets the failing status itself. A `return 1` here printed FAILED
+    // and exited 0 — a check that reports a violation and passes anyway.
+    process.exit(1);
+  }
 
   for (const { abs, rel } of files) {
     const buf = fs.readFileSync(abs);
