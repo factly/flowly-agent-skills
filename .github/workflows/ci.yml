@@ -284,6 +284,29 @@ jobs:
       - name: Every Flowly tool the corpus names is in the pinned snapshot
         run: node scripts/check-tool-drift.js
 
+  round-trip:
+    name: Round-trip case
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: The case checker works
+        run: node --test scripts/check-round-trip-case-test.js
+
+      # `claude plugin eval` is in early access, so the case itself cannot be
+      # RUN — here or anywhere. That is precisely why this gate matters: the one
+      # artifact measuring the product's central claim is the one artifact
+      # nothing executes, and without this job a corrupt `case.yaml` passes every
+      # other gate in this file. The checker needs `ruby` for the YAML parse and
+      # reports plainly if it is absent rather than passing silently; the runner
+      # image ships it.
+      - name: The round-trip case still parses and names only things that exist
+        run: node scripts/check-round-trip-case.js
+
   # ── Behaviour ───────────────────────────────────────────────────────────────
 
   evals:
@@ -415,9 +438,36 @@ jobs:
 
   # ── Aggregate ───────────────────────────────────────────────────────────────
 
+  ci-coverage:
+    name: Every gate runs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The gate on the gates. It reads this file and asserts that every
+      # validator and test suite in `scripts/` and every hook test suite is
+      # invoked somewhere above, and that every job above is listed in `gates`
+      # below. Both halves were written after a real miss: the round-trip
+      # checker and its twenty-one tests sat unwired for a full phase while CI
+      # reported all green.
+      - name: The coverage checker works
+        run: node --test scripts/check-ci-coverage-test.js
+
+      - name: Every shipped gate is wired into this workflow
+        run: node scripts/check-ci-coverage.js
+
   # One status to require in branch protection instead of listing every gate
   # above and having to remember to add the next one. It reports, it does not
   # gate: every job above runs regardless of this one.
+  #
+  # The `needs:` list is exhaustive by assertion, not by discipline —
+  # `check-ci-coverage.js` fails if a job above is missing from it, which is the
+  # only thing standing between a new job and a required status that silently
+  # stops covering it.
   gates:
     name: All gates green
     runs-on: ubuntu-latest
@@ -432,10 +482,12 @@ jobs:
       - commands
       - command-refs
       - tool-drift
+      - round-trip
       - evals
       - hooks
       - manifests
       - install
+      - ci-coverage
     steps:
       - name: Result of every gate
         shell: bash
