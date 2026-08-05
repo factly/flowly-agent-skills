@@ -200,6 +200,19 @@ jobs:
             exit 1
           fi
 
+      # Shares this job because it shares the precondition: it diffs the tree
+      # against the same base SHA and is meaningless on a shallow clone. It
+      # reports the fetch-depth cause itself rather than failing obscurely.
+      - name: The checker for recorded deletions works
+        run: node --test scripts/check-deletions-test.js
+
+      # The register covers files that EXIST. This covers the ones that do not.
+      # A merge cannot tell "an inherited file is gone" from "an inherited file
+      # was never here", so upstream offers every deletion back as a
+      # modify/delete conflict and an unrecorded one gets silently reinstated.
+      - name: Every inherited file this fork deleted is recorded in NOTICE.md
+        run: node scripts/check-deletions.js
+
   # ── Routing and wiring ──────────────────────────────────────────────────────
 
   catalog:

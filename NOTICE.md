@@ -43,10 +43,18 @@ to rot, because each one is a manifest or a command set that would have to be ke
 | `.agents/plugins/marketplace.json` | Antigravity marketplace manifest |
 | `.opencode/skills` | opencode symlink into `skills/` |
 | `scripts/validate-commands.js`, `scripts/validate-commands-test.js` | The three-way parity checker that held the Claude, Gemini and Antigravity command directories in sync |
+| `docs/antigravity-setup.md`, `docs/gemini-cli-setup.md`, `docs/opencode-setup.md` | Install guides for three of the doors removed above. A guide to a door this fork does not ship is a guide to a broken install |
+| `docs/codex-setup.md` | The Codex install guide — see the paragraph below, where the manifest is kept and the guide is not |
+| `docs/comparison.md` | Upstream's honest map of how it differs from two other skills collections. It compares *upstream* to them, and this fork is a third thing again; keeping it would have meant maintaining a comparison of a project we are not |
+| `.github/workflows/test-plugin-install.yml` | Upstream's standalone install smoke test. Superseded, not dropped: the `install` job in `.github/workflows/ci.yml` does the same thing and is one of the jobs `gates` requires, so the coverage moved rather than went. It left later than the rest, when CI was wired |
 
 `.codex-plugin/plugin.json` is **kept**. The Codex door is not shipped and not tested, but it is held
 openable by two authoring rules that cost nothing: no substitution token in any command body, and
 skill frontmatter limited to `name` and `description`.
+
+Its setup guide went anyway, and the asymmetry is deliberate: the manifest costs nothing to keep and
+holds a door openable, while a published guide is a promise that the door is tested. Openable and
+supported are different claims, and only one of them is true.
 
 `plugin.json` at the repository root was Antigravity's plugin manifest — the counterpart to the
 marketplace manifest above — and was removed with it.
@@ -72,6 +80,15 @@ distribution does not have — the one failure a router is there to prevent — 
 clean while doing it. So the path is not `owned` and re-bound; it is gone, and the replacement is
 `new` at a name of ours. `scripts/check-catalog.js` is what makes that replacement true, holding the
 catalog to the skills tree in both directions.
+
+Its eval case and fixture went with it, at `evals/cases/using-agent-skills.json` and
+`evals/fixtures/using-agent-skills/incident.md`. Both are recorded here for a reason the two entries
+above do not have: git does not see them as deletions at all. Their replacements are close enough to
+the originals that rename detection pairs them — 74% and 100% similar to
+`evals/cases/flowly-catalog.json` and `evals/fixtures/flowly-catalog/incident.md` — so any
+enumeration of what this fork deleted will omit them unless it passes `--no-renames`, and the
+deletions most worth recording are exactly the ones that were replaced rather than dropped.
+`scripts/check-deletions.js` passes it.
 
 One inherited artifact outlives it: `scripts/lib/skill-lint.js` still carries a section exemption
 keyed to the literal name `using-agent-skills`, which now matches nothing. That is deliberate and it
