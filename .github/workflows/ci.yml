@@ -1,0 +1,382 @@
+name: CI
+
+# Every gate this distribution has, run on every change.
+#
+# ONE JOB PER GATE, AND NO `needs:` EDGES BETWEEN THEM
+# ----------------------------------------------------
+# GitHub shows job names in the checks list and step names only once you open
+# the log. So the unit of "what broke" is the job, and each gate here gets one.
+# A red run names the gate on the summary page: `Ownership register`,
+# `No hostname or workspace path`, `Install door`.
+#
+# Nothing is gated behind anything else, deliberately. Sequencing would save a
+# few runner-minutes on a doomed run and cost the thing this repository most
+# needs: the monthly upstream merge is one event that can break several gates at
+# once, and a resolver wants the whole list from one run rather than one gate
+# per iteration. A skipped job is also not a passed job, and a wall of grey
+# `skipped` badges is exactly the report that gets misread as "only one thing
+# is wrong".
+#
+# The `install` job in particular is NOT gated behind `manifests`. The
+# acceptance for this workflow is verified by breaking a manifest on purpose and
+# watching the INSTALL job go red; if install were gated it would be skipped
+# instead, and that probe could not be run at all.
+#
+# That probe was run locally against claude 2.1.220, setting
+# `plugins[0].name` to an integer, and it is worth recording exactly where it
+# lands, because it is not where you would guess:
+#
+#     claude plugin validate --strict .              exit 1   (manifests job)
+#     claude plugin marketplace add ./               exit 0   ← passes
+#     claude plugin install flowly@flowly-agent-skills   exit 1   (install job)
+#
+# So `marketplace add` accepts a manifest that `validate` rejects, and the
+# install job goes red one step later — with a message that blames a stale local
+# copy ("Your local copy may be out of date") rather than naming the type error.
+# Both jobs are needed: `manifests` is the one that says what is actually wrong.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Read-only. Nothing here publishes, comments, or writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded PR pushes are cancelled; runs on the default branch are not,
+  # because those are the ones anyone later goes looking for.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ── Skill content ───────────────────────────────────────────────────────────
+
+  skills:
+    name: Skill anatomy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Every SKILL.md matches the anatomy this repo documents
+        run: node scripts/validate-skills.js
+
+  standard:
+    name: Agent Skills open standard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      # This gate is one half of what holds the doors this fork does not ship
+      # openable: frontmatter limited to `name` and `description`. See
+      # docs/install.md § Doors kept openable.
+      #
+      # The script also accepts `--reference`, which drives the standard's own
+      # pinned reference validator over every skill via npx. It is not run here:
+      # the script's own header argues that an npm download does not belong on
+      # the critical path of a check that must work on a public repository's
+      # first commit. Turning it on is a decision to take on purpose, not a line
+      # to add quietly.
+      - name: Every skill is valid under the open standard, two fields only
+        run: bash scripts/validate-standard.sh
+
+  # ── The one-way door ────────────────────────────────────────────────────────
+
+  hosts:
+    name: No hostname or workspace path
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # This repository has been public since its first commit. A hostname that
+      # reaches a public commit cannot be withdrawn — not by a force-push, not
+      # by making the repository private. Every other gate here guards something
+      # recoverable; this one does not.
+      - name: Nothing host-shaped or user-path-shaped is about to be published
+        run: node scripts/check-no-hosts.js
+
+  # ── The fork ────────────────────────────────────────────────────────────────
+
+  binding:
+    name: Flowly binding
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: No shipped file still points at a planning destination we removed
+        run: node scripts/check-binding.js
+
+  register:
+    name: Ownership register
+    runs-on: ubuntu-latest
+    steps:
+      # fetch-depth: 0 IS THE GATE. This is not tidiness.
+      #
+      # actions/checkout defaults to a shallow clone, and the base SHA in
+      # NOTICE.md is then not a commit this checkout can see. Measured on a
+      # --depth 1 clone, check-register.js reports:
+      #
+      #     ✗  base SHA
+      #          ERROR: Base SHA is not a commit in this repository: bdf76c7…
+      #     –  `unchanged` really is unchanged — skipped, the base SHA above is unusable
+      #     –  `bound` really is bound — skipped, the base SHA above is unusable
+      #
+      # The run is red, but for the wrong reason, and the two checks that
+      # actually protect the fork — the byte-for-byte comparisons against
+      # upstream — are SKIPPED, not failed. Anyone who "fixed" the red by
+      # relaxing the base-SHA assertion would get a green run with both
+      # comparisons silently disabled forever.
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # `shell: bash` rather than the default, because it adds `-o pipefail`:
+      # without it the pipe into tee would report tee's exit code and this gate
+      # would pass on a failing check.
+      - name: The register and the tree describe the same set of files
+        shell: bash
+        run: node scripts/check-register.js | tee "$RUNNER_TEMP/register.log"
+
+      # A check that can silently skip needs its own presence asserted. Today a
+      # skip is accompanied by a base-SHA error, so the exit code above does
+      # catch it — but that is a coupling inside another script, not a property
+      # anything declares. This step asserts the two comparisons RAN, so the
+      # protection survives someone loosening the base-SHA assertion.
+      - name: Prove the byte-for-byte comparisons ran rather than skipped
+        shell: bash
+        run: |
+          ran=1
+          grep -qF '✓  `unchanged` really is unchanged' "$RUNNER_TEMP/register.log" || ran=0
+          grep -qF '✓  `bound` really is bound'         "$RUNNER_TEMP/register.log" || ran=0
+          if [ "$ran" -ne 1 ]; then
+            echo '::error::check-register.js exited 0 without running the byte-for-byte comparisons against the base SHA.'
+            echo '::error::Those two checks SKIP — they do not fail — when the base SHA is unreachable, which is what a shallow clone produces.'
+            echo '::error::Restore fetch-depth: 0 on the checkout in this job.'
+            grep -F 'really is' "$RUNNER_TEMP/register.log" || true
+            exit 1
+          fi
+
+  # ── Routing and wiring ──────────────────────────────────────────────────────
+
+  catalog:
+    name: Skill catalog
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The checker first, then its verdict. A broken checker's green is not
+      # evidence about the catalog.
+      - name: The catalog checker works
+        run: node --test scripts/check-catalog-test.js
+
+      - name: The catalog and the skills tree are the same set, both directions
+        run: node scripts/check-catalog.js
+
+  commands:
+    name: Lifecycle commands
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # The other half of what holds the unshipped doors openable: no
+      # substitution token in any command body. See docs/install.md.
+      - name: Six commands, no substitution tokens, every named skill resolves
+        run: node scripts/check-commands.js
+
+  tool-drift:
+    name: Tool drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: The drift checker works
+        run: node --test scripts/check-tool-drift-test.js
+
+      # Snapshot mode — the default, and the only mode CI can run.
+      #
+      # NO CREDENTIAL AND NO ENDPOINT BELONG IN THIS FILE. `--live` reads
+      # FLOWLY_MCP_URL and FLOWLY_MCP_TOKEN from the environment and answers the
+      # question this mode cannot: whether Flowly has renamed a tool since the
+      # snapshot was taken. That mode is for a human or a private scheduled job
+      # against a real instance. Wiring it here would mean putting an instance
+      # hostname into a public repository, which is the one mistake nothing can
+      # undo — see the `hosts` job above.
+      - name: Every Flowly tool the corpus names is in the pinned snapshot
+        run: node scripts/check-tool-drift.js
+
+  # ── Behaviour ───────────────────────────────────────────────────────────────
+
+  evals:
+    name: Trigger and routing evals
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: The eval runner works
+        run: node --test scripts/run-evals-test.js
+
+      # Ranking is zero-sum: adding or renaming one skill re-scores every other
+      # one. The floor is the aggregate, not any single skill's row.
+      - name: Every skill routes, and rank-1 has not fallen below the floor
+        run: node scripts/run-evals.js --min-rank1 80
+
+  hooks:
+    name: Session hooks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: The session-start hook survives a stripped PATH
+        run: bash hooks/session-start-test.sh
+
+      - name: The simplify-ignore hook behaves with and without jq
+        run: bash hooks/simplify-ignore-test.sh
+
+  # ── The shipped door ────────────────────────────────────────────────────────
+
+  manifests:
+    name: Plugin manifests (strict)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # WHAT THIS COVERS, MEASURED AGAINST claude 2.1.220
+      #
+      # Pointed at the repository root, `validate` reads the marketplace
+      # manifest AND, through its plugin entry, the fields of the plugin
+      # manifest it points at — a bad type in .claude-plugin/plugin.json is
+      # reported as `plugins[0] plugin.json → …` and exits 1. Probed. --strict
+      # additionally turns warnings, such as an unknown field, into errors; a
+      # warning-only run under --strict was probed exiting 1 too.
+      #
+      # WHAT IT DOES NOT COVER: pointed at .claude-plugin/plugin.json directly,
+      # `validate` additionally scans the plugin TREE, and that form exits 1
+      # today over a warning about CLAUDE.md at the plugin root. Adding it here
+      # would mean deciding what happens to CLAUDE.md, which is a repository
+      # decision and not this workflow's to take. It is named rather than
+      # omitted so the next reader knows the gap is known.
+      - name: Marketplace and plugin manifests validate with warnings fatal
+        run: claude plugin validate --strict .
+
+  install:
+    name: Install door
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # The documented workaround for the SSH-vs-HTTPS clone failure users hit
+      # on Windows and macOS. Applied here so CI exercises the same path
+      # docs/install.md tells a teammate to take.
+      - name: Configure git to clone GitHub over HTTPS
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      # Added from the checkout, not from GitHub. This gate is about whether
+      # THIS commit's manifests install, not about whether GitHub is reachable —
+      # a network flake here would look identical to a broken manifest.
+      - name: Add this checkout as a marketplace
+        run: claude plugin marketplace add ./
+
+      - name: List marketplaces
+        run: claude plugin marketplace list
+
+      - name: Install the plugin
+        run: claude plugin install flowly@flowly-agent-skills --scope user
+
+      # `install` exiting 0 is not evidence the plugin resolves afterwards.
+      # These two steps assert it does: the id appears in the installed list,
+      # and the component inventory can be computed — which exits non-zero if
+      # the plugin cannot be resolved and loaded.
+      - name: The plugin is installed under the id the docs tell people to use
+        shell: bash
+        run: |
+          claude plugin list | tee "$RUNNER_TEMP/plugins.txt"
+          if ! grep -qF 'flowly@flowly-agent-skills' "$RUNNER_TEMP/plugins.txt"; then
+            echo '::error::claude plugin install exited 0 but flowly@flowly-agent-skills is not in the installed list.'
+            exit 1
+          fi
+
+      - name: The installed plugin has a component inventory
+        run: claude plugin details flowly@flowly-agent-skills
+
+  # ── Aggregate ───────────────────────────────────────────────────────────────
+
+  # One status to require in branch protection instead of listing every gate
+  # above and having to remember to add the next one. It reports, it does not
+  # gate: every job above runs regardless of this one.
+  gates:
+    name: All gates green
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - skills
+      - standard
+      - hosts
+      - binding
+      - register
+      - catalog
+      - commands
+      - tool-drift
+      - evals
+      - hooks
+      - manifests
+      - install
+    steps:
+      - name: Result of every gate
+        shell: bash
+        run: printf '%s\n' '${{ toJSON(needs) }}'
+
+      # `skipped` and `cancelled` count as failure. A gate that did not run is
+      # not a gate that passed, and treating either as success is how a required
+      # check turns into a green badge that asserts nothing.
+      - name: Fail unless every gate succeeded
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: |
+          echo '::error::At least one gate did not succeed. See the job list above.'
+          exit 1

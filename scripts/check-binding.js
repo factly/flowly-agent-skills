@@ -134,6 +134,12 @@ const ALLOWED_MENTIONS = [
     line: '- A plan document written into the working tree — `tasks/plan.md`, `tasks/todo.md`, or anything like them',
     reason: 'a red flag naming what a red flag looks like',
   },
+  {
+    file: 'docs/sync.md',
+    line: 'Upstream\'s side restored *"Save the plan to `tasks/plan.md` … per the `/plan` command convention"*',
+    reason:
+      'the sync rehearsal record quoting the upstream hunk it rejected — a resolver has to be able to recognise the reverting text on sight, and this check is the reason it was caught',
+  },
 ];
 
 /**
