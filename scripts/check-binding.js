@@ -59,6 +59,23 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 // forbidden token by construction, and so does check-commands.js.
 const SCAN_ROOTS = ['skills', 'references', 'agents', 'commands', 'docs', 'evals', 'hooks'];
 
+// Root prose, scanned as its own pseudo-root. These are not a tree, so the walk
+// above cannot reach them, and they were outside every check here until a
+// mutation put `Save the plan to \`tasks/plan.md\`` into each of the five and
+// this script stayed green for all of them.
+//
+// The two that matter most are CLAUDE.md and AGENTS.md: agent harnesses load
+// them automatically, so an unbound destination there is read by an agent
+// before it reads anything else — the highest-leverage place in the repository
+// for exactly the instruction this check exists to forbid. README.md is the
+// third, because it states the product claim ("rather than to a local file")
+// that the rest of the corpus is held to, and nothing was holding it.
+//
+// The same five files as check-command-refs.js ROOT_PROSE, deliberately: one
+// list of what counts as this repository's front matter, read by both sweeps.
+const ROOT_PROSE = ['README.md', 'AGENTS.md', 'CLAUDE.md', 'CONTRIBUTING.md', 'NOTICE.md'];
+const ROOT_PROSE_LABEL = '<root>';
+
 const SCAN_EXTS = ['.md', '.json', '.sh', '.txt', '.yml', '.yaml'];
 
 /**
@@ -139,6 +156,28 @@ const ALLOWED_MENTIONS = [
     line: 'Upstream\'s side restored *"Save the plan to `tasks/plan.md` … Create the `tasks/` directory"*',
     reason:
       'the sync rehearsal record quoting the upstream hunk it rejected — a resolver has to be able to recognise the reverting text on sight, and this check is the reason it was caught',
+  },
+  // NOTICE.md § Removed at import exists to NAME the paths this fork deleted,
+  // and the forbidden list below is largely made of those same paths. The
+  // collision is structural, not accidental: the record of a removal and the
+  // prohibition on the thing removed must both spell it. A record that cannot
+  // name what it records is not a record, and NOTICE.md instructs nobody — it
+  // is read by a human resolving a merge, never by an agent mid-run.
+  {
+    file: 'NOTICE.md',
+    line: '`.claude/commands/` — upstream\'s eight Claude Code slash commands — went later, not at import, when',
+    reason: 'the deletion record naming the command directory it records as deleted',
+  },
+  {
+    file: 'NOTICE.md',
+    line: '`.claude/commands/`, which is gone too — so nothing here descends from anything upstream ships, and a',
+    reason: 'the same deletion, in the paragraph explaining what replaced it',
+  },
+  {
+    file: 'NOTICE.md',
+    line: 'Its entire body was `IDEAS_DIR="docs/ideas"` and a `mkdir -p`: it existed to create the directory',
+    reason:
+      'the deletion record quoting the deleted script\'s body — the quotation is the evidence that the script had no job left, which is the whole reason it went',
   },
 ];
 
@@ -299,15 +338,26 @@ function collect() {
     }));
     byRoot.set(root, files);
   }
+
+  const rootFiles = ROOT_PROSE
+    .map((rel) => ({ rel, abs: path.join(REPO_ROOT, rel) }))
+    .filter(({ abs }) => fs.existsSync(abs))
+    .map(({ rel, abs }) => ({ rel, text: fs.readFileSync(abs, 'utf8') }));
+  byRoot.set(ROOT_PROSE_LABEL, rootFiles);
+
   return byRoot;
 }
+
+// Every key of the map collect() returns, so the coverage check below cannot
+// silently stop counting a root that the sweep is still reading.
+const ALL_ROOTS = [...SCAN_ROOTS, ROOT_PROSE_LABEL];
 
 // Check 1 — a root that contributed nothing means the sweep never ran there,
 // and every downstream check is vacuously green for that whole subtree.
 function checkScanCoverage(byRoot, report) {
   let errors = 0;
   const empty = [];
-  for (const root of SCAN_ROOTS) {
+  for (const root of ALL_ROOTS) {
     if (byRoot.get(root).length === 0) empty.push(root);
   }
   for (const root of empty) {
@@ -315,8 +365,8 @@ function checkScanCoverage(byRoot, report) {
     errors += 1;
   }
   if (errors === 0) {
-    const counts = SCAN_ROOTS.map((r) => `${r}/ ${byRoot.get(r).length}`).join(', ');
-    report.pass(`all ${SCAN_ROOTS.length} scan roots non-empty — ${counts}`);
+    const counts = ALL_ROOTS.map((r) => `${r}/ ${byRoot.get(r).length}`).join(', ');
+    report.pass(`all ${ALL_ROOTS.length} scan roots non-empty — ${counts}`);
   }
   return errors;
 }
@@ -442,7 +492,7 @@ function main() {
   console.log('\nBinding check — planning artifacts belong on the issue, not on disk\n');
 
   const byRoot = collect();
-  const files = SCAN_ROOTS.flatMap((r) => byRoot.get(r));
+  const files = ALL_ROOTS.flatMap((r) => byRoot.get(r));
   const byRel = new Map(files.map((f) => [f.rel, f.text]));
 
   let errorCount = 0;
