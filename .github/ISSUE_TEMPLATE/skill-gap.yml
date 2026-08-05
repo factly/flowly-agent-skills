@@ -25,6 +25,7 @@ body:
         - deprecation-and-migration
         - documentation-and-adrs
         - doubt-driven-development
+        - flowly-catalog
         - frontend-ui-engineering
         - git-workflow-and-versioning
         - idea-refine
@@ -38,7 +39,6 @@ body:
         - source-driven-development
         - spec-driven-development
         - test-driven-development
-        - using-agent-skills
         - other / not sure
     validations:
       required: true

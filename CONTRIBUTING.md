@@ -42,6 +42,7 @@ Every new skill must have:
 - `SKILL.md` in the skill directory
 - YAML frontmatter with valid `name` and `description`
 - An eval case file at `evals/cases/<skill-name>.json` — at least 3 positive triggers, 2 negative triggers (with `owner` where possible), and 1 behavioral eval. Execution evals must be backed by real files under `evals/fixtures/`; conversation-shaped skills may use a reviewer-gated `kind: "dialogue"` eval instead (see [evals/README.md](evals/README.md)). CI enforces these requirements.
+- A row in the Skill Index of [`skills/flowly-catalog/SKILL.md`](skills/flowly-catalog/SKILL.md), naming the phase it belongs to. `scripts/check-catalog.js` holds the catalog and the skills tree to the same set in both directions, so a skill that ships without a row turns it red — and a skill nothing routes to is a skill nothing ever invokes.
 
 New skills should generally follow the standard anatomy:
 
@@ -78,14 +79,14 @@ We don't accept translations of the documentation (README, `docs/`) or of skills
 
 ## Testing Hooks
 
-The session-start hook (`hooks/session-start.sh`) injects the `using-agent-skills` meta-skill into every new Claude Code session. A regression test at `hooks/session-start-test.sh` validates the hook's JSON payload.
+The session-start hook (`hooks/session-start.sh`) injects the `flowly-catalog` skill into every new Claude Code session. A regression test at `hooks/session-start-test.sh` validates the hook's JSON payload.
 
 **The hook's runtime dependency is bash (3.2 or newer) and nothing else.** It builds its JSON with shell builtins — no `jq`, no `node`, no coreutils — so it works on a machine with an empty `PATH`, and the test runs it that way to keep it honest. Anything you add to it must hold that line: reaching for an external tool trades one install-time failure for another, on a hook whose failure mode is a session that quietly starts without the catalog.
 
 Run it before opening any PR that touches:
 
 - `hooks/session-start.sh`
-- `skills/using-agent-skills/SKILL.md` (the meta-skill content embedded by the hook)
+- `skills/flowly-catalog/SKILL.md` (the catalog content embedded by the hook)
 
 ```bash
 bash hooks/session-start-test.sh
@@ -96,7 +97,7 @@ Expected output: `session-start JSON payload OK`. The script exits non-zero on a
 ### Exercising the escaping
 
 The payload is one JSON string containing a whole markdown file, escaped by hand in bash. The shipped
-`using-agent-skills/SKILL.md` happens to contain no backslashes and no control characters, so a
+`flowly-catalog/SKILL.md` happens to contain no backslashes and no control characters, so a
 round-trip against it alone cannot see a broken backslash or `\u00xx` rule — it passes either way.
 The test therefore also runs an adversarial fixture (backslashes, one of them immediately before a
 newline, quotes, tabs, CRLF, several C0 controls, box drawing, no trailing newline) and compares the

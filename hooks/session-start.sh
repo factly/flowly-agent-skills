@@ -1,6 +1,6 @@
 #!/bin/bash
 # agent-skills session start hook
-# Injects the using-agent-skills meta-skill into every new session
+# Injects the flowly-catalog skill into every new session
 #
 # Runtime dependency: bash (3.2 or newer) and nothing else. The JSON payload is
 # built with shell builtins only - no jq, no node, no coreutils - so the hook
@@ -15,9 +15,9 @@ script_dir=${0%/*}
 script_dir=$(cd "$script_dir" && printf '%s' "$PWD")
 
 SKILLS_DIR="${script_dir%/*}/skills"
-META_SKILL="$SKILLS_DIR/using-agent-skills/SKILL.md"
+META_SKILL="$SKILLS_DIR/flowly-catalog/SKILL.md"
 
-PREFACE="agent-skills loaded. Use the skill discovery flowchart to find the right skill for your task."
+PREFACE="agent-skills loaded. Use the flowly-catalog phase tree and skill index to find the right skill for your task."
 
 # A newline, escaped for JSON: the two characters backslash and n.
 NEWLINE_ESCAPE='\n'
@@ -102,7 +102,7 @@ else
   # may legally contain a newline, and json_escape_chunk is newline-free by
   # contract, so this - the branch whose whole job is to fail safely - would be
   # the one emitting invalid JSON. The expected location is fixed, so name that.
-  json_escape_chunk "agent-skills: the using-agent-skills catalog was not found or could not be read. Expected skills/using-agent-skills/SKILL.md next to this hook's parent directory. Skills remain available individually."
+  json_escape_chunk "agent-skills: the flowly-catalog skill catalog was not found or could not be read. Expected skills/flowly-catalog/SKILL.md next to this hook's parent directory. Skills remain available individually."
   json_escape_controls "$json_escaped"
   printf '{"priority":"INFO","message":"%s"}\n' "$json_escaped"
 fi

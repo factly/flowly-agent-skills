@@ -22,7 +22,7 @@
       },
       {
         "prompt": "Which skill should handle this request?",
-        "owner": "using-agent-skills"
+        "owner": "flowly-catalog"
       }
     ]
   },

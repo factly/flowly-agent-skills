@@ -40,7 +40,7 @@ your-project/
 │   ├── rules/                    # Short .mdc policies (yours)
 │   │   └── agent-skills.mdc      # Optional: “use project skills” pointer
 │   └── skills/                   # What Cursor Agent loads
-│       ├── using-agent-skills/
+│       ├── flowly-catalog/
 │       ├── test-driven-development/
 │       ├── code-review-and-quality/
 │       └── …                     # Synced from agent-skills + your own skills
@@ -99,7 +99,7 @@ alwaysApply: true
 
 Before non-trivial technical work:
 
-1. Route via `.cursor/skills/using-agent-skills/SKILL.md`.
+1. Route via `.cursor/skills/flowly-catalog/SKILL.md`.
 2. Read and follow the matching skill under `.cursor/skills/<name>/SKILL.md`.
 3. Open `reference.md` in that folder when the skill links to it.
 4. Prefer project skills over guessing; user does not need to say "read skill" each time.
@@ -141,7 +141,7 @@ Project skills in `.cursor/skills/` take precedence for **this** repo’s workfl
 
 ## How agents should use skills
 
-1. **Discover** — `using-agent-skills` maps task phase → skill name.
+1. **Discover** — `flowly-catalog` maps task phase → skill name.
 2. **Read** — full process in `.cursor/skills/<name>/SKILL.md`.
 3. **Deep dive** — `reference.md`, `references/*.md`, or linked checklists when the skill says so.
 4. **Combine** — e.g. `incremental-implementation` + `api-and-interface-design` for an API slice.
@@ -161,7 +161,7 @@ Explicit user phrases (“follow TDD”, “use code-review-and-quality”) stil
 | Security / performance | `security-and-hardening`, `performance-optimization` |
 | Git / CI / ship | `git-workflow-and-versioning`, `ci-cd-and-automation`, `shipping-and-launch` |
 
-Full tree: `skills/using-agent-skills/SKILL.md` in the repo.
+Full tree: `skills/flowly-catalog/SKILL.md` in the repo.
 
 ---
 

@@ -24,13 +24,15 @@ Claude Code is the only door this fork ships and tests. Slash commands read `/fl
 
 ## Skills by Phase
 
-**Under all six:** flowly-connect (the door every other Flowly skill assumes is open), flowly-loop-runs (a run spans plan and build)
+**Under all six:** flowly-catalog (the router, and the one place the shared Flowly conventions are written down), flowly-connect (the door every other Flowly skill assumes is open), flowly-loop-runs (a run spans plan and build)
 **Define:** flowly-define, interview-me, idea-refine, spec-driven-development
 **Plan:** flowly-plan, flowly-plan-gate, planning-and-task-breakdown
 **Build:** flowly-build, incremental-implementation, test-driven-development, context-engineering, source-driven-development, doubt-driven-development, frontend-ui-engineering, api-and-interface-design
 **Verify:** flowly-verify, browser-testing-with-devtools, debugging-and-error-recovery
 **Review:** flowly-review, code-review-and-quality, code-simplification, security-and-hardening, performance-optimization
 **Ship:** flowly-ship, git-workflow-and-versioning, ci-cd-and-automation, deprecation-and-migration, documentation-and-adrs, observability-and-instrumentation, shipping-and-launch
+
+This list and `skills/flowly-catalog/SKILL.md` must agree; `scripts/check-catalog.js` holds the catalog to the skills tree in both directions, so a skill added here without a catalog row turns it red.
 
 The `flowly-` skills bind a phase to the tracker; the inherited one beside each still governs the craft. Where they share a name they are not alternatives — `flowly-review` is where a run's verdict lives, `code-review-and-quality` is how to form one; `flowly-ship` is the release record, `shipping-and-launch` is launch readiness.
 

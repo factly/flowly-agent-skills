@@ -28,7 +28,7 @@ A new project is the best-case scenario: there's no legacy behavior to preserve,
 ### Day 0 | Install and wire up
 
 1. Install the pack (see [getting-started.md](getting-started.md)).
-2. Load `using-agent-skills` (the meta-skill) so the agent can route work to the right skill on its own.
+2. Load `flowly-catalog` (the router) so the agent can route work to the right skill on its own.
 3. Add a short project rules file (`CLAUDE.md`, `.cursorrules`, etc.) with your stack, commands, and boundaries, `context-engineering` describes what belongs there.
 
 ### Day 0 | Define before you build
@@ -66,7 +66,7 @@ Run the lifecycle in order for the project's first real feature:
 ### Greenfield anti-patterns
 
 - **Skipping `/spec` because "it's just a prototype."** Prototypes become products. The spec is the cheapest artifact you'll ever write for this codebase.
-- **Loading all 24 skills into every session.** It wastes context and dilutes the ones that matter. Load by phase; let `using-agent-skills` route.
+- **Loading every skill in the pack into every session.** It wastes context and dilutes the ones that matter. Load by phase; let `flowly-catalog` route.
 - **Deferring observability until "there's something to observe."** Instrument as you build, retrofitting structured logging is a Path B problem you're choosing to create.
 
 ---
@@ -122,7 +122,7 @@ Both end in the same steady state: `/spec → /plan → /build → /review → /
 
 |                        | Greenfield                     | Brownfield                               |
 | ---------------------- | ------------------------------ | ---------------------------------------- |
-| First skill loaded     | `using-agent-skills` + `/spec` | `context-engineering`                    |
+| First skill loaded     | `flowly-catalog` + `/spec`     | `context-engineering`                    |
 | First value delivered  | Spec'd, tested first feature   | Zero-risk reviews and safer bug fixes    |
 | TDD posture            | Universal from commit one      | Selective: tests where change is planned |
 | Refactoring rule       | Rare (little to refactor)      | Characterization tests first, always     |

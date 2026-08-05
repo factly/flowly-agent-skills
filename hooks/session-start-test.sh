@@ -12,7 +12,7 @@
 set -euo pipefail
 
 HOOK="hooks/session-start.sh"
-SKILL="skills/using-agent-skills/SKILL.md"
+SKILL="skills/flowly-catalog/SKILL.md"
 
 if [ ! -f "$HOOK" ] || [ ! -f "$SKILL" ]; then
   echo "run this from the repository root: bash hooks/session-start-test.sh" >&2
@@ -73,10 +73,10 @@ install_hook_at "$orphan"
 # with-newline case).
 hostile="$work_dir/hostile"
 install_hook_at "$hostile"
-fixture="$hostile/skills/using-agent-skills/SKILL.md"
-mkdir -p "$hostile/skills/using-agent-skills"
+fixture="$hostile/skills/flowly-catalog/SKILL.md"
+mkdir -p "$hostile/skills/flowly-catalog"
 printf '%s' \
-'# Using Agent Skills
+'# Flowly Skill Catalog
 
 Backslashes: one\two, a double\\here, and one before the newline\
 Escaped already: \\n and \" and \\\\
@@ -93,12 +93,12 @@ printf '\r\nControl characters: ESC[\x1b] VT[\x0b] BS[\x08] FF[\x0c]\nNo trailin
 # payload ends up announcing IMPORTANT with nothing but the preface in it.
 unreadable="$work_dir/unreadable"
 install_hook_at "$unreadable"
-mkdir -p "$unreadable/skills/using-agent-skills"
-cp "$SKILL" "$unreadable/skills/using-agent-skills/SKILL.md"
-chmod 000 "$unreadable/skills/using-agent-skills/SKILL.md"
+mkdir -p "$unreadable/skills/flowly-catalog"
+cp "$SKILL" "$unreadable/skills/flowly-catalog/SKILL.md"
+chmod 000 "$unreadable/skills/flowly-catalog/SKILL.md"
 
 payload_unreadable=""
-if [ -r "$unreadable/skills/using-agent-skills/SKILL.md" ]; then
+if [ -r "$unreadable/skills/flowly-catalog/SKILL.md" ]; then
   # Positive control: root reads a chmod 000 file, so the state this case is
   # about does not exist here. Skip it rather than assert over an absence that
   # was never built.
@@ -126,7 +126,7 @@ const fs = require('fs');
 
 // Must match the preface the hook prepends to the catalog, byte for byte.
 const PREFACE =
-  'agent-skills loaded. Use the skill discovery flowchart to find the right skill for your task.\n\n';
+  'agent-skills loaded. Use the flowly-catalog phase tree and skill index to find the right skill for your task.\n\n';
 
 function fail(message) {
   throw new Error(message);
@@ -164,8 +164,8 @@ function assertCatalogInjected(label, payload) {
   if (!payload.message.includes('agent-skills loaded.')) {
     fail(`${label}: message is missing the startup preface`);
   }
-  if (!payload.message.includes('# Using Agent Skills')) {
-    fail(`${label}: message is missing using-agent-skills content`);
+  if (!payload.message.includes('# Flowly Skill Catalog')) {
+    fail(`${label}: message is missing flowly-catalog content`);
   }
 }
 
@@ -235,13 +235,13 @@ function assertUnavailableCatalog(label, payload) {
   if (payload.priority === 'IMPORTANT') {
     fail(`${label}: must not claim IMPORTANT priority when nothing was injected`);
   }
-  if (payload.message.includes('# Using Agent Skills')) {
+  if (payload.message.includes('# Flowly Skill Catalog')) {
     fail(`${label}: message should not contain catalog content`);
   }
   if (!/not found/i.test(payload.message)) {
     fail(`${label}: message does not say the catalog was unavailable: ${JSON.stringify(payload.message)}`);
   }
-  if (!payload.message.includes('using-agent-skills')) {
+  if (!payload.message.includes('flowly-catalog')) {
     fail(`${label}: message does not name the missing catalog: ${JSON.stringify(payload.message)}`);
   }
 }

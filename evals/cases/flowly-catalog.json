@@ -1,5 +1,5 @@
 {
-  "skill_name": "using-agent-skills",
+  "skill_name": "flowly-catalog",
   "trigger": {
     "positive": [
       {
@@ -29,13 +29,14 @@
     {
       "id": 1,
       "prompt": "A user asks: 'the login page is broken after yesterday's deploy'. Decide which skill applies and why.",
-      "expected_output": "Correct routing through the decision tree with the chosen skill and rationale",
+      "expected_output": "Correct routing through the phase tree with the chosen skill and rationale",
       "files": [
-        "using-agent-skills"
+        "flowly-catalog"
       ],
       "expectations": [
-        "The chosen skill matches the decision tree in the meta-skill",
+        "The chosen skill matches the phase tree and the skill index in the catalog",
         "The rationale references the routing logic rather than guessing",
+        "The skill it names appears in the catalog's index rather than being invented",
         "Core operating behaviors (assumptions surfaced) are respected"
       ]
     }

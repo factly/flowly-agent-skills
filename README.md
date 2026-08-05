@@ -19,7 +19,7 @@ Skills activate automatically based on what you're doing — designing an API tr
 ## Status
 
 This distribution is **under construction and not yet announced**. What is here today is the
-inherited corpus — 24 skills, 4 agent personas, 7 reference checklists — plus the structural gates
+inherited corpus — 23 skills, 4 agent personas, 7 reference checklists — plus the structural gates
 that everything authored afterwards has to pass.
 
 **The six lifecycle commands ship.** `/flowly:research`, `/flowly:plan`, `/flowly:build`,
@@ -77,15 +77,15 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ## All 33 Skills
 
-The pack includes 33 skills total — 32 lifecycle skills plus the `using-agent-skills` meta-skill. Nine of them are ours, the `flowly-` prefixed set; the other 24 are inherited. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 33 skills total — 32 lifecycle skills plus the `flowly-catalog` router. Ten of them are ours, the `flowly-` prefixed set; the other 23 are inherited. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 The Flowly set covers each of the six phases, plus two that sit under all of them: `flowly-connect`, because every other one assumes the door is open, and `flowly-loop-runs`, because a run spans the plan and build phases rather than sitting in either.
 
-### Meta - Discover which skill applies
+### Catalog - Discover which skill applies
 
 | Skill | What It Does | Use When |
 |-------|-------------|----------|
-| [using-agent-skills](skills/using-agent-skills/SKILL.md) | Maps incoming work to the right skill workflow and defines shared operating rules | Starting a session or deciding which skill applies |
+| [flowly-catalog](skills/flowly-catalog/SKILL.md) | Routes incoming work to the skill that governs it, and states the Flowly conventions — inverted priority, what `null` means, the absent pagination, the list cap — that every other skill assumes | Starting a session, deciding which skill applies, or before the first Flowly tool call |
 
 ### Flowly - Reach the tracker and drive a run
 
@@ -225,7 +225,7 @@ Every skill follows a consistent anatomy:
 
 ```
 flowly-agent-skills/
-├── skills/                            # 33 skills (32 lifecycle + 1 meta)
+├── skills/                            # 33 skills (32 lifecycle + the catalog that routes to them)
 ├── agents/                            # 4 specialist personas
 ├── references/                        # 7 supplementary checklists
 ├── commands/                          # the 6 lifecycle commands, each taking an issue identifier
@@ -248,8 +248,8 @@ registers them.
 
 ## Checks
 
-Five gates run over this repository. Each one has a mutation that turns it red, which is the only
-reason to believe it works:
+The structural gates below run over this repository. Each one has a mutation that turns it red,
+which is the only reason to believe it works:
 
 | Check | Asserts | Turns red when |
 |---|---|---|
@@ -258,6 +258,8 @@ reason to believe it works:
 | `node scripts/check-commands.js` | Exactly six commands, each with a description, no substitution token in any body, the identifier-resolution block verbatim in all six, every named skill resolving, and a rendered size under Codex's migration cap | A substitution token is added to a command body |
 | `node scripts/check-no-hosts.js` | No hostname outside a curated allowlist, and no absolute workspace path, anywhere in the tree | Any new hostname appears |
 | `node scripts/check-register.js` | Every shipped file is registered exactly once, the base SHA is an ancestor of `HEAD`, and every `unchanged` file really is byte-identical to it | A file is added without a register row |
+| `node scripts/check-binding.js` | No shipped file names a planning destination this distribution does not have, and every rebound file names the Flowly capability that replaced it | A skill is rebound by deleting a path without naming its successor |
+| `node scripts/check-catalog.js` | `flowly-catalog` and the skills tree name the same set, in both directions, across the six phases, and the shared Flowly conventions are still stated | A skill is added without a catalog row, or a catalog row names a skill that does not exist |
 
 `check-no-hosts.js` is the one that matters most. This repository is public, making a repository
 public later does not scrub its history, and GitHub's push protection matches credential patterns —

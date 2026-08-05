@@ -62,7 +62,7 @@ node scripts/run-evals.js
 node scripts/run-evals.js --behavioral <skill-name> --dry-run
 
 # Hook regression test, required if you touch hooks/session-start.sh
-# or skills/using-agent-skills/SKILL.md
+# or skills/flowly-catalog/SKILL.md
 bash hooks/session-start-test.sh
 ```
 
@@ -90,13 +90,14 @@ One point worth internalizing rather than looking up: when writing trigger promp
 
 - Docs and skills are **English only**; translations aren't accepted because they drift ([CONTRIBUTING.md](../CONTRIBUTING.md#translations) has the rationale).
 - Changes to `scripts/run-evals.js` or the eval schema should stay compatible with skill-creator's `evals.json` schema (adopted verbatim for the behavioral tier; that compatibility is a feature, not an accident).
-- Anything touching the session-start hook or the meta-skill it embeds requires the hook regression test (§3).
+- Anything touching the session-start hook or the catalog it embeds requires the hook regression test (§3).
 
 ## 5. Pre-PR checklist
 
 - [ ] Tier 1 green: `node scripts/validate-skills.js`
 - [ ] Tier 2 green: `node scripts/run-evals.js`
-- [ ] Hook test green if you touched `hooks/` or `using-agent-skills`
+- [ ] Hook test green if you touched `hooks/` or `flowly-catalog`
+- [ ] Catalog gate green: `node scripts/check-catalog.js` — a new skill needs a row in the catalog's index
 - [ ] New skill → eval case file present with the minimum trigger/behavioral counts
 - [ ] New skill → gap justified in the PR description; catalog and open PRs checked
 - [ ] No duplicated content; cross-references used instead
@@ -105,7 +106,7 @@ One point worth internalizing rather than looking up: when writing trigger promp
 ## 6. Suggested reading order
 
 1. [README.md](../README.md): the catalog and the lifecycle diagram (10 min)
-2. `skills/using-agent-skills/SKILL.md`: how routing works from the agent's side
+2. `skills/flowly-catalog/SKILL.md`: how routing works from the agent's side, and the Flowly conventions the rest of the pack assumes
 3. One well-established skill end to end (e.g. `test-driven-development`): internalize the anatomy by example
 4. [skill-anatomy.md](skill-anatomy.md): the format spec, now with context
 5. [evals/README.md](../evals/README.md): the three tiers and the case format

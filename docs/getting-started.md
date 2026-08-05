@@ -35,9 +35,9 @@ Copy the relevant `SKILL.md` content into your agent's system prompt, rules file
 
 **Conversation:** Reference the skill when giving instructions: "Follow the test-driven-development process for this change."
 
-### 4. Use the meta-skill for discovery
+### 4. Use the catalog for discovery
 
-Start with the `using-agent-skills` skill loaded. It contains a flowchart that maps task types to the appropriate skill.
+Start with the `flowly-catalog` skill loaded. It carries a phase tree that maps task types to the appropriate skill, an index of every skill in the pack, and the Flowly conventions the rest of them assume.
 
 ## Recommended Setup
 

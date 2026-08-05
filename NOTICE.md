@@ -59,6 +59,27 @@ files reached no user; what they still did was load as *project* commands for an
 repository, under names that collided with ours and pointing at a plugin namespace that no longer
 exists.
 
+`skills/using-agent-skills/SKILL.md` — upstream's meta-skill — went later too, when this fork's own
+catalog was written at `skills/flowly-catalog/SKILL.md`. It is recorded here for the same reason as
+the two entries above: a merge cannot tell "an inherited file is gone" apart from "an inherited file
+was never here", so upstream will offer it back on the next sync, and the answer is no.
+
+The answer is no because the file's entire content was a claim about a catalog that is not ours. It
+enumerated 24 skills in a routing flowchart, a lifecycle sequence and a quick-reference table; this
+fork ships 33, nine of them Flowly-native, arranged around six phases and a tracker upstream knows
+nothing about. Merging its updates would import a router that sends agents to skills this
+distribution does not have — the one failure a router is there to prevent — and the merge would look
+clean while doing it. So the path is not `owned` and re-bound; it is gone, and the replacement is
+`new` at a name of ours. `scripts/check-catalog.js` is what makes that replacement true, holding the
+catalog to the skills tree in both directions.
+
+One inherited artifact outlives it: `scripts/lib/skill-lint.js` still carries a section exemption
+keyed to the literal name `using-agent-skills`, which now matches nothing. That is deliberate and it
+is left alone. The linter is registered `unchanged` for the reason in the table above — an edit there
+is a cost paid on every merge forever — and the exemption's practical effect is that
+`flowly-catalog` gets no exemption at all: it carries the full skill anatomy (Overview, When to Use,
+Common Rationalizations, Red Flags, Verification) and is validated like every other skill.
+
 `skills/idea-refine/scripts/idea-refine.sh` went later still, when the inherited corpus was rebound.
 Its entire body was `IDEAS_DIR="docs/ideas"` and a `mkdir -p`: it existed to create the directory
 that skill saved its one-pager into. Under the binding a refined idea becomes a Flowly issue, so the
@@ -163,6 +184,7 @@ carried would have been an unverified claim.
 | `skills/documentation-and-adrs/SKILL.md` | `bound` |
 | `skills/doubt-driven-development/SKILL.md` | `unchanged` |
 | `skills/flowly-build/SKILL.md` | `new` |
+| `skills/flowly-catalog/SKILL.md` | `new` |
 | `skills/flowly-connect/SKILL.md` | `new` |
 | `skills/flowly-define/SKILL.md` | `new` |
 | `skills/flowly-loop-runs/SKILL.md` | `new` |
@@ -188,4 +210,3 @@ carried would have been an unverified claim.
 | `skills/source-driven-development/SKILL.md` | `unchanged` |
 | `skills/spec-driven-development/SKILL.md` | `bound` |
 | `skills/test-driven-development/SKILL.md` | `unchanged` |
-| `skills/using-agent-skills/SKILL.md` | `unchanged` |
