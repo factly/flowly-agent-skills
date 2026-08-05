@@ -37,13 +37,51 @@
  * examples in these comments use <angle-bracket> placeholders instead of
  * host-shaped literals.
  *
- * SCOPE
- * -----
- * Every file in the repo, walked from the filesystem, minus:
- *   - `.git/`
- *   - anything matching `.gitignore` (a deliberately simple matcher — see
- *     `loadGitignore`; it covers the pattern forms this repo actually uses)
- *   - binary files (detected by a NUL byte in the first 8 KiB)
+ * ALSO REFUSED: CREDENTIALS
+ * -------------------------
+ * Same one-way door, worse consequences. GitHub's push protection covers some
+ * of the vendor prefixes below, but it has never heard of Flowly's own, and it
+ * runs on push — after the commit exists locally, and not at all on a fork or a
+ * mirror. A credential in a public commit is spent: the remedy is rotation, not
+ * deletion, because the value was fetched before the fix landed.
+ *
+ * The false-positive risk here is specific and severe, because this repository
+ * is a CORPUS OF SECURITY SKILLS. `skills/flowly-connect/SKILL.md` names both
+ * Flowly prefixes in a table so a reader can tell which credential they hold;
+ * `security-and-hardening` teaches what a leaked key looks like. So the rule is
+ * shaped, not allowlisted: a prefix is a credential only when enough
+ * high-entropy body follows it. A prefix written bare in prose has no body and
+ * is not a match, and a body that is obviously a teaching device — repeated
+ * characters, the word EXAMPLE — is not one either. See CREDENTIAL_PATTERNS.
+ *
+ * SCOPE — WHAT IS SCANNED MUST BE WHAT SHIPS
+ * ------------------------------------------
+ * Enumeration comes from `git ls-files`, not from the filesystem, because the
+ * two disagree in exactly the places a leak hides:
+ *
+ *   - a GITIGNORED BUT TRACKED file — force-added, or tracked before a
+ *     `.gitignore` pattern started matching it — is public, and a walk that
+ *     honours `.gitignore` skips it unread while reporting it as skipped in
+ *     the same breath as PASSED;
+ *   - a SYMLINK is stored by git as a blob whose CONTENT IS THE TARGET PATH, so
+ *     a link into a home directory publishes that path verbatim. Following it
+ *     reads the wrong bytes and skipping it reads none, which is what the walk
+ *     did. Here the link is read as its target string.
+ *
+ * The set is `--cached --others --exclude-standard`: what ships today, plus
+ * what would ship on the next `git add .`. `.git/` never appears in it.
+ *
+ * The filesystem walk survives as a FALLBACK for a tree that is not a
+ * repository — the test fixtures are exactly that. A fallback is where this
+ * kind of gate goes quietly wrong, so it is not silent: the mode is printed on
+ * every run, and under CI (or `--require-git`) a missing work tree is a hard
+ * failure rather than a degradation. See `parseFlags`.
+ *
+ * Still out of scope, and named here so the gap is not mistaken for coverage:
+ *   - binary files (detected by a NUL byte in the first 8 KiB) — a secret in a
+ *     compiled artefact or an image's metadata is unread;
+ *   - repository HISTORY — this checks the working tree only, so a hostname
+ *     already committed is invisible to it.
  *
  * ESCAPE HATCH — AND WHEN IT IS LEGITIMATE
  * ----------------------------------------
@@ -75,6 +113,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
@@ -86,6 +125,30 @@ const REPO_ROOT = path.resolve(__dirname, '..');
 function parseRoot(argv) {
   const i = argv.indexOf('--root');
   return i === -1 ? REPO_ROOT : path.resolve(argv[i + 1]);
+}
+
+/**
+ * Flags, and the one judgement call in them.
+ *
+ * `--require-git` turns a missing work tree from a fallback into a failure.
+ * `CI` does the same implicitly, and that is deliberate rather than lazy: a
+ * guarantee that depends on somebody remembering to add a flag to a workflow
+ * file is off until they do, and this gate's whole failure mode is being green
+ * for the wrong reason. In CI there is always a checkout, so a missing work
+ * tree there means the checkout or the working directory is wrong — which is
+ * precisely the state in which the walk would scan a smaller set and report
+ * PASSED. Every provider this repo could use sets `CI`; GitHub Actions, which
+ * it does use, sets it to `true` on every job.
+ *
+ * The cost is that the environment can turn the strictness ON but never OFF —
+ * there is no `--no-require-git`, because that flag's only use is to make this
+ * failure go away, and the failure is the point.
+ */
+function parseFlags(argv) {
+  return {
+    root: parseRoot(argv),
+    requireGit: argv.includes('--require-git') || Boolean(process.env.CI),
+  };
 }
 
 // ─── Allowlist ───────────────────────────────────────────────────────────────
@@ -484,6 +547,157 @@ function fencedLineSet(lines) {
   return { fenced, unclosedAt: open === null ? -1 : openedAt };
 }
 
+// ─── Credential grammar ──────────────────────────────────────────────────────
+//
+// TWO GATES, FOR THE SAME REASON THE BARE-TOKEN RULE HAS TWO
+// ----------------------------------------------------------
+// A prefix alone cannot be the rule. Measured against this tree before a single
+// pattern was written: `flo_pat_` and `flo_oat_` each appear once, in the
+// three-credentials table in `skills/flowly-connect/SKILL.md`, written bare in
+// backticks so a reader can identify what they are holding. `sk-` appears
+// inside about forty lines — `planning-and-task-breakdown`, `risk-based`,
+// `disk-backed`, `task-scoped`. Every one of those is correct content in a repo
+// whose whole product is security and planning guidance, and a gate that turns
+// them red is a gate somebody deletes from CI by Friday.
+//
+// GATE 1 — a left boundary. The prefix must not continue a word, which is what
+// keeps `task-` and `risk-` out of the `sk-` rule.
+//
+// GATE 2 — enough body to be a credential. Each pattern below requires the
+// vendor's real token length (or a conservative floor), of the vendor's real
+// alphabet. A prefix with nothing behind it is not a match, so the shipped
+// documentation stays green without a single allowlist entry or inline marker —
+// which is the shape to prefer, because an allowlist entry protects one
+// spelling and a well-shaped rule protects every future one.
+//
+// On top of both, `looksLikePlaceholder` lets through the token-shaped strings
+// documentation genuinely uses. That is a deliberate, bounded hole: see its
+// header for what it costs.
+//
+// NOT COVERED, and named so the gap is not mistaken for coverage: a bare
+// high-entropy string with no vendor prefix (a database password, a random
+// hex key) is indistinguishable from a hash, a UUID or a lockfile integrity
+// field, and every entropy-only heuristic tried on corpora like this one is
+// dominated by its false positives.
+
+const PLACEHOLDER_WORDS = ['EXAMPLE', 'REDACTED', 'PLACEHOLDER', 'YOURTOKEN', 'NOTASECRET'];
+
+/**
+ * Is this token body a teaching device rather than a credential?
+ *
+ * Security documentation is made of token-shaped strings that are not tokens:
+ * `<prefix>xxxxxxxx…`, `<prefix>0000…`, and AWS's own published example key id,
+ * whose body ends in the word EXAMPLE precisely so that scanners can tell.
+ * This repo ships that kind of documentation, so the rule has to admit it.
+ *
+ * WHAT IT COSTS. A real credential could in principle be waved through by
+ * containing one of these words or six identical characters in a row. For a
+ * 36-character base62 body the odds of either are on the order of 1 in 10^4,
+ * and no issuer generates keys that way. The reverse mistake — refusing correct
+ * documentation — is the one that gets this check switched off, so the trade is
+ * taken deliberately and in this direction.
+ */
+function looksLikePlaceholder(body) {
+  if (/(.)\1{5,}/.test(body)) return true;
+  if (new Set(body).size <= 4) return true;
+  const upper = body.toUpperCase();
+  return PLACEHOLDER_WORDS.some(word => upper.includes(word));
+}
+
+/**
+ * Each entry captures the PREFIX in group 1 and the BODY in group 2, so the
+ * report can name the prefix — which is what tells you where to go and revoke —
+ * without echoing the secret into a CI log.
+ */
+const CREDENTIAL_PATTERNS = [
+  // ── Flowly's own ──────────────────────────────────────────────────────────
+  // The reason this section exists. No third-party scanner has heard of these,
+  // so nothing else in the pipeline is looking.
+  { kind: 'flowly token', re: /(?<![A-Za-z0-9_])(flo_[po]at_)([A-Za-z0-9_-]{16,})/g },
+
+  // ── GitHub ────────────────────────────────────────────────────────────────
+  // Classic tokens are a four-character prefix plus 36 base62: `ghp` personal,
+  // `gho` OAuth, `ghu` user-to-server, `ghs` server-to-server, `ghr` refresh.
+  { kind: 'github token', re: /(?<![A-Za-z0-9_])(gh[pousr]_)([A-Za-z0-9]{36,})/g },
+  // Fine-grained: `github_pat_` + 22 base62 + `_` + 59 base62. The floor is set
+  // below the real length so a future format change still trips it.
+  { kind: 'github token', re: /(?<![A-Za-z0-9_])(github_pat_)([A-Za-z0-9_]{40,})/g },
+
+  // ── Model-provider keys ───────────────────────────────────────────────────
+  { kind: 'anthropic key', re: /(?<![A-Za-z0-9-])(sk-ant-)([A-Za-z0-9_-]{20,})/g },
+  // The generic OpenAI-style `sk-`. The left boundary is doing real work here:
+  // without it this fires on `task-`, `risk-` and `disk-` throughout the tree.
+  { kind: 'api key', re: /(?<![A-Za-z0-9-])(sk-)([A-Za-z0-9]{20,})/g },
+
+  // ── Cloud and registry ────────────────────────────────────────────────────
+  // AWS access key ids are exactly 20 characters: `AKIA` (long-term) or `ASIA`
+  // (temporary) plus 16 uppercase base36. Both boundaries are anchored because
+  // the length is exact.
+  { kind: 'aws key id', re: /(?<![A-Za-z0-9])(A[KS]IA)([A-Z0-9]{16})(?![A-Za-z0-9])/g },
+  { kind: 'slack token', re: /(?<![A-Za-z0-9-])(xox[baprs]-)([A-Za-z0-9-]{20,})/g },
+  { kind: 'google api key', re: /(?<![A-Za-z0-9])(AIza)([A-Za-z0-9_-]{35})(?![A-Za-z0-9_-])/g },
+  { kind: 'gitlab token', re: /(?<![A-Za-z0-9-])(glpat-)([A-Za-z0-9_-]{20,})/g },
+  { kind: 'npm token', re: /(?<![A-Za-z0-9_])(npm_)([A-Za-z0-9]{36,})/g },
+
+  // ── A JWT in compact serialization ────────────────────────────────────────
+  // Anchored on `eyJ` rather than on "three base64url segments", and that is a
+  // narrowing worth stating. A JWS header is base64url of a JSON object, so it
+  // begins `eyJ` in every conforming token that exists — the anchor costs
+  // nothing in recall over real JWTs. What it buys is not matching every long
+  // dotted string: a generic three-segment rule loose enough to catch a short
+  // token also catches package names, versioned identifiers and base64 blobs,
+  // and this repo is full of all three. A hand-rolled three-segment credential
+  // that is not a JWT is the acknowledged gap.
+  {
+    kind: 'jwt',
+    re: /(?<![A-Za-z0-9_-])(eyJ)([A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})(?![A-Za-z0-9_-])/g,
+  },
+];
+
+// A PEM private key header. Written with `-{5}` rather than five literal
+// hyphens so this file does not contain the string it refuses — the same
+// discipline the host examples in the header follow, and for the same reason.
+// `PUBLIC KEY` is deliberately not matched: a public key is published on
+// purpose. The header alone is the finding; there is no body to redact, and
+// printing it discloses no key material.
+const PEM_PRIVATE_KEY = /-{5}BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-{5}/g;
+
+/**
+ * Credential findings for one line.
+ *
+ * `text` is REDACTED — prefix plus a length, never the body. This check's
+ * output goes to a CI log, which is the single hardest place to scrub, so a
+ * report that pasted the secret would republish it in the act of complaining
+ * about it. The prefix says which issuer to revoke at and the length
+ * distinguishes two findings on one line; that is everything a fixer needs.
+ * `dedupe` keeps the raw match out of the report while still telling two
+ * distinct tokens apart.
+ */
+function findCredentials(line) {
+  const found = [];
+  for (const { kind, re } of CREDENTIAL_PATTERNS) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      const [, prefix, body] = m;
+      if (looksLikePlaceholder(body)) continue;
+      found.push({
+        text: `${prefix}…[${body.length} chars redacted]`,
+        dedupe: m[0],
+        host: null,
+        kind: 'credential',
+        credentialKind: kind,
+      });
+    }
+  }
+  PEM_PRIVATE_KEY.lastIndex = 0;
+  let m;
+  while ((m = PEM_PRIVATE_KEY.exec(line)) !== null) {
+    found.push({ text: m[0], dedupe: m[0], host: null, kind: 'credential', credentialKind: 'private key' });
+  }
+  return found;
+}
+
 // ─── Matchers ────────────────────────────────────────────────────────────────
 
 /**
@@ -676,10 +890,106 @@ function findCandidates(line, applyBareRule) {
     found.push({ text: m[0], host: null, kind: 'workspace path' });
   }
 
+  // ── 6. Credentials ────────────────────────────────────────────────────────
+  //
+  // Unconditional, like matcher 5 and unlike the bare-token rule: there is no
+  // prose gate to earn, because a secret in a masked TypeScript fence or in a
+  // `.ts` file is exactly as published as one in a paragraph. The gates that
+  // keep this usable are the prefix boundary and the entropy floor, and both
+  // live in the patterns themselves rather than in where they are applied.
+  found.push(...findCredentials(line));
+
   return found;
 }
 
-// ─── Filesystem walk ─────────────────────────────────────────────────────────
+// ─── Enumeration ─────────────────────────────────────────────────────────────
+//
+// Two modes, and the difference between them is the difference between what
+// SHIPS and what happens to be on this disk. See the SCOPE section in the
+// header for why that gap is where a leak hides. Whichever mode runs, it is
+// named in the output — a fallback nobody can see is how a gate comes to report
+// PASSED over a set nobody chose.
+
+const GIT_MODE = 'git ls-files';
+const WALK_MODE = 'filesystem-walk';
+
+// Why the last `gitPaths` call returned null, for the CI refusal message.
+let gitRefusalReason = 'git reported no work tree here';
+
+/**
+ * The paths git would publish from `root`, or null if `root` is not in a work
+ * tree (or git is not installed).
+ *
+ * `--cached` is the half that matters: it lists a file that `.gitignore`
+ * matches but that is TRACKED ANYWAY, which is public and which the walk skips
+ * unread. `--others --exclude-standard` adds what is not yet added but would
+ * be on the next `git add .`, so a leak is caught before the commit rather
+ * than after it. `.git/` appears in neither.
+ *
+ * Run with `-C root`, so a root that is a SUBDIRECTORY of a repository yields
+ * exactly the tracked paths under it, relative to it. That is the right answer
+ * for that case too, and it is why no comparison against the toplevel is
+ * needed here.
+ */
+function gitPaths(root) {
+  const probe = spawnSync('git', ['-C', root, 'rev-parse', '--is-inside-work-tree'], {
+    encoding: 'utf8',
+  });
+  if (probe.error || probe.status !== 0 || probe.stdout.trim() !== 'true') {
+    // Keep git's own words. When this refusal is the thing that fails CI, the
+    // cause is nearly always operational rather than a missing checkout —
+    // `detected dubious ownership` in a container job is the common one — and
+    // a message that only says "not a work tree" sends the reader looking in
+    // the wrong place.
+    gitRefusalReason = (probe.error && probe.error.message)
+      || (probe.stderr || '').trim()
+      || 'git reported no work tree here';
+    return null;
+  }
+
+  const ls = spawnSync(
+    'git',
+    ['-C', root, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  if (ls.error || ls.status !== 0) {
+    gitRefusalReason = (ls.error && ls.error.message) || (ls.stderr || '').trim() || 'git ls-files failed';
+    return null;
+  }
+  // A path in a conflicted index appears once per stage; the Set collapses it.
+  return [...new Set(ls.stdout.split('\0').filter(Boolean))];
+}
+
+/**
+ * Turn git's path list into scannable entries.
+ *
+ * A symlink is kept, not skipped, and marked so the reader knows to take its
+ * TARGET as the content — that string is literally the blob git stores. A
+ * gitlink (a submodule) is a directory here and carries no blob of its own, so
+ * it is skipped and counted; scanning a submodule is a separate repository's
+ * job. A path in the index with nothing on disk is a staged deletion.
+ */
+function collectFromGit(root, paths, skipped) {
+  const files = [];
+  for (const rel of paths) {
+    if (EXCLUDED_PATHS.includes(rel)) { skipped.excluded.push(rel); continue; }
+    const abs = path.join(root, rel);
+    let st;
+    try {
+      st = fs.lstatSync(abs);
+    } catch {
+      skipped.absent.push(rel);
+      continue;
+    }
+    if (st.isSymbolicLink()) { files.push({ abs, rel, symlink: true }); continue; }
+    if (st.isDirectory()) { skipped.submodules.push(rel); continue; }
+    if (!st.isFile()) { skipped.absent.push(rel); continue; }
+    files.push({ abs, rel, symlink: false });
+  }
+  return files;
+}
+
+// ─── Filesystem walk (the fallback) ──────────────────────────────────────────
 
 /**
  * Parse `.gitignore` into matcher predicates.
@@ -757,22 +1067,52 @@ function walk(dir, rules, out, skipped, root) {
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main(argv = process.argv.slice(2)) {
-  const root = parseRoot(argv);
-  const rules = loadGitignore(root);
-  const files = [];
-  const skipped = { git: false, ignored: [], excluded: [], symlinks: [], binary: [] };
+  const { root, requireGit } = parseFlags(argv);
+  const skipped = {
+    git: false, ignored: [], excluded: [], symlinks: [], binary: [],
+    submodules: [], absent: [],
+  };
 
-  walk(root, rules, files, skipped, root);
+  const paths = gitPaths(root);
+  const mode = paths ? GIT_MODE : WALK_MODE;
+  let files;
+
+  if (paths) {
+    files = collectFromGit(root, paths, skipped);
+  } else {
+    // The one place this gate could go quietly wrong. Degrading to the walk
+    // means scanning a set that is smaller than the shipping set in exactly the
+    // ways the header describes, and reporting PASSED over it — the same green,
+    // none of the coverage. Under CI that is refused outright rather than
+    // announced, because nobody reads a warning in a green job.
+    if (requireGit) {
+      console.log(`✗  ${root} is not a git work tree, and git enumeration was required`);
+      console.log(`   git said: ${gitRefusalReason}`);
+      console.log(
+        '   The shipping set comes from `git ls-files`. Falling back to the filesystem walk here\n' +
+        '   would scan a DIFFERENT, SMALLER set — gitignored-but-tracked files and symlink\n' +
+        '   targets would go unread — and still print PASSED. Check out the repository, run\n' +
+        '   from inside it, and make sure `git` is on PATH and owns the checkout.'
+      );
+      console.log(`\nenumeration: none — the ${WALK_MODE} fallback was refused`);
+      console.log('\n1 violation(s) — FAILED');
+      process.exit(1);
+    }
+    files = [];
+    walk(root, loadGitignore(root), files, skipped, root);
+  }
+
   files.sort((a, b) => a.rel.localeCompare(b.rel));
 
   const violations = [];
   let scanned = 0;
+  let symlinksRead = 0;
 
-  // A walk that finds nothing satisfies every assertion below without making
-  // one. On a one-way door that is the worst possible way to report success,
-  // so say it plainly instead.
+  // An enumeration that finds nothing satisfies every assertion below without
+  // making one. On a one-way door that is the worst possible way to report
+  // success, so say it plainly instead.
   if (files.length === 0) {
-    console.log('✗  no files to scan — the walk found nothing, which is not the same as clean');
+    console.log(`✗  no files to scan — ${mode} found nothing, which is not the same as clean`);
     console.log('\n1 violation(s) — FAILED');
     // process.exit, not `return`: main() is invoked bare at the bottom of this
     // file and sets the failing status itself. A `return 1` here printed FAILED
@@ -780,12 +1120,23 @@ function main(argv = process.argv.slice(2)) {
     process.exit(1);
   }
 
-  for (const { abs, rel } of files) {
-    const buf = fs.readFileSync(abs);
-    if (isBinary(buf)) { skipped.binary.push(rel); continue; }
+  for (const { abs, rel, symlink } of files) {
+    let contents;
+    if (symlink) {
+      // The blob git stores for a symlink IS the target path, so that string is
+      // what gets published. Reading the link rather than following it is the
+      // only way to see it: following reads some other file's bytes, and the
+      // walk's answer — skip — read nothing at all.
+      contents = fs.readlinkSync(abs);
+      symlinksRead++;
+    } else {
+      const buf = fs.readFileSync(abs);
+      if (isBinary(buf)) { skipped.binary.push(rel); continue; }
+      contents = buf.toString('utf8');
+    }
     scanned++;
 
-    const lines = buf.toString('utf8').split('\n');
+    const lines = contents.split('\n');
     const ext = path.extname(rel).toLowerCase();
     const sourceFile = BARE_RULE_SKIP_EXTENSIONS.has(ext);
     const fences = sourceFile ? null : fencedLineSet(lines);
@@ -812,7 +1163,10 @@ function main(argv = process.argv.slice(2)) {
       const seen = new Set();
       for (const c of findCandidates(line, applyBareRule)) {
         if (c.host !== null && isAllowedHost(c.host)) continue;
-        const key = `${c.kind}:${c.text}`;
+        // `dedupe` is the raw match where the report text is redacted, so two
+        // different credentials on one line stay two findings without either
+        // of them reaching the log.
+        const key = `${c.kind}:${c.dedupe || c.text}`;
         if (seen.has(key)) continue;
         seen.add(key);
         violations.push({ rel, line: i + 1, text: c.text, kind: c.kind });
@@ -828,11 +1182,31 @@ function main(argv = process.argv.slice(2)) {
     `\n${scanned} file(s) scanned — ${violations.length} violation(s) — ` +
     `${violations.length === 0 ? 'PASSED' : 'FAILED'}`
   );
-  console.log(
-    `skipped: .git${skipped.git ? '' : ' (absent)'}, ` +
-    `${skipped.ignored.length} gitignored, ${skipped.binary.length} binary, ` +
-    `${skipped.symlinks.length} symlink(s), ${skipped.excluded.length} path-excluded`
-  );
+
+  // The mode, on every run, passing or failing. This line is the difference
+  // between a fallback and a silent degradation: without it a green run says
+  // nothing about WHICH set was green, and the smaller set is the one that
+  // looks identical from here.
+  if (mode === GIT_MODE) {
+    console.log(
+      `enumeration: ${GIT_MODE} — the set that ships (tracked + not-yet-ignored), ` +
+      `${symlinksRead} symlink(s) read as target text`
+    );
+    console.log(
+      `skipped: ${skipped.binary.length} binary, ${skipped.submodules.length} submodule, ` +
+      `${skipped.absent.length} absent-on-disk, ${skipped.excluded.length} path-excluded`
+    );
+  } else {
+    console.log(
+      `enumeration: ${WALK_MODE} — NOT a git work tree, so gitignored-but-tracked ` +
+      `files and symlink targets are UNREAD`
+    );
+    console.log(
+      `skipped: .git${skipped.git ? '' : ' (absent)'}, ` +
+      `${skipped.ignored.length} gitignored, ${skipped.binary.length} binary, ` +
+      `${skipped.symlinks.length} symlink(s), ${skipped.excluded.length} path-excluded`
+    );
+  }
 
   if (violations.length > 0) {
     console.log(
@@ -841,6 +1215,10 @@ function main(argv = process.argv.slice(2)) {
       `documentation, or mark the line with '${ALLOW_MARKER}' if it is a ` +
       `deliberate host-shaped fixture. See this script's header before ` +
       `reaching for the marker.\n` +
+      `A [credential] is worse: deleting the line does not un-publish it. ROTATE ` +
+      `it at the issuer first, then remove it. If it is documentation rather ` +
+      `than a secret, give it a placeholder body — the rule is shaped to allow ` +
+      `those, so it needs no marker.\n` +
       `An [unclosed fence] is not a hostname: close the fence. Until you do, ` +
       `every line after it is masked from the bare-token rule, so this run ` +
       `cannot tell you whether that region is clean.`

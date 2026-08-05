@@ -58,15 +58,58 @@ const url = host => 'https' + '://' + host;
 
 function sandbox(files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'check-no-hosts-test-'));
-  for (const [rel, body] of Object.entries(files)) {
+  for (const [rel, contents] of Object.entries(files)) {
     fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
-    fs.writeFileSync(path.join(root, rel), body);
+    fs.writeFileSync(path.join(root, rel), contents);
   }
   return root;
 }
 
-function run(root) {
-  return spawnSync(process.execPath, [CHECKER, '--root', root], { encoding: 'utf8' });
+/**
+ * Run a real `git` inside a fixture repository. Every call here is scoped to a
+ * freshly-created temp directory by `cwd`, so nothing can reach a working tree
+ * that matters.
+ */
+function git(root, ...args) {
+  const r = spawnSync('git', args, { cwd: root, encoding: 'utf8' });
+  assert.equal(r.status, 0, `git ${args.join(' ')} failed: ${r.stderr}`);
+  return r.stdout;
+}
+
+/**
+ * A fixture that is a real repository.
+ *
+ * Gap 1 is a claim about ENUMERATION — that what the checker reads is what git
+ * will publish — and no scratch directory can test it, because the whole point
+ * is that git's answer differs from the filesystem's. So these fixtures are
+ * `git init`ed for real. Nothing is committed: `git add` writes the index, and
+ * the index is what `git ls-files --cached` reads, so no identity is needed.
+ */
+function gitSandbox(files, { symlinks = {}, force = [] } = {}) {
+  const root = sandbox(files);
+  git(root, 'init', '-q');
+  for (const [rel, target] of Object.entries(symlinks)) {
+    fs.mkdirSync(path.join(root, path.dirname(rel)), { recursive: true });
+    fs.symlinkSync(target, path.join(root, rel));
+  }
+  git(root, 'add', '-A');
+  for (const p of force) git(root, 'add', '-f', p);
+  return root;
+}
+
+/**
+ * `CI` is cleared by default. The sandboxes below are deliberately NOT
+ * repositories — they exist to exercise the matchers, one document at a time —
+ * and under CI the checker refuses to scan a non-repository at all, because a
+ * silent fall back to the filesystem walk is how this gate would come to report
+ * PASSED over a smaller set than the one that ships. The two tests that are
+ * about that refusal set `CI` back explicitly.
+ */
+function run(root, env = {}) {
+  return spawnSync(process.execPath, [CHECKER, '--root', root], {
+    encoding: 'utf8',
+    env: { ...process.env, CI: '', ...env },
+  });
 }
 
 /** Assert one document is refused, and say what should have caught it. */
@@ -502,4 +545,257 @@ test('allows a path under /root, which contains no username', () => {
   // documentation this repo ships.
   allows(`Mount ${abs('root', '.cache')} for the build cache.\n`, 'root is not a username');
   allows(`Mount ${abs('root', '.cargo', 'registry')} in CI.\n`, 'standard CI documentation');
+});
+
+// ── enumeration: what is scanned must be what ships ───────────────────────
+//
+// Every test above this line is about what the checker RECOGNISES. These are
+// about what it READS, which is a different question and was answered by the
+// filesystem: `readdirSync`, minus gitignored paths, minus symlinks. Each of
+// those subtractions is a hole, because git's idea of what ships is not the
+// filesystem's — and a hole here is invisible in the report, which says PASSED
+// either way.
+
+test('the enumeration mode is named in the output, in both directions', () => {
+  // A silent fall back to the walk is the failure this whole section exists to
+  // prevent: the gate would report PASSED while scanning a smaller set than the
+  // one that ships. So the mode is printed, and both spellings are pinned —
+  // asserting only the absence of the other would go green if the line vanished.
+  const plain = run(sandbox({ 'docs/guide.md': 'ordinary prose\n' }));
+  assert.match(plain.stdout, /^enumeration: filesystem-walk\b/m);
+  assert.doesNotMatch(plain.stdout, /^enumeration: git ls-files\b/m);
+
+  const repo = run(gitSandbox({ 'docs/guide.md': 'ordinary prose\n' }));
+  assert.match(repo.stdout, /^enumeration: git ls-files\b/m);
+  assert.doesNotMatch(repo.stdout, /^enumeration: filesystem-walk\b/m);
+});
+
+test('a gitignored file that is tracked anyway is scanned, because it ships', () => {
+  // `git add -f .env.production` publishes the file. So does a tracked path
+  // that a later `.gitignore` pattern starts matching. Under the filesystem
+  // walk both were skipped unread, and the run reported them as `gitignored`
+  // in the same breath as PASSED.
+  const root = gitSandbox(
+    {
+      '.gitignore': 'secrets.md\n',
+      'docs/guide.md': 'ordinary prose\n',
+      'secrets.md': `Endpoint: ${url(INSTANCE)}/mcp\n`,
+    },
+    { force: ['secrets.md'] },
+  );
+  const out = run(root);
+  assert.equal(out.status, 1, `a force-added file is public\n--- output ---\n${out.stdout}`);
+  assert.match(out.stdout, /secrets\.md:1/);
+});
+
+test('and a gitignored file that is NOT tracked stays out of scope', () => {
+  // The other half, and the reason the answer has to come from git rather than
+  // from widening the walk. An ignored, untracked file does not ship; reporting
+  // it would be the false positive that gets the gate switched off.
+  const root = gitSandbox({ '.gitignore': 'secrets.md\n', 'docs/guide.md': 'prose\n' });
+  fs.writeFileSync(path.join(root, 'secrets.md'), `Endpoint: ${url(INSTANCE)}/mcp\n`);
+  const out = run(root);
+  assert.equal(out.status, 0, `an untracked ignored file publishes nothing\n${out.stdout}`);
+});
+
+test('a symlink is read as its target text, which is what git stores', () => {
+  // Git stores a symlink as a blob whose CONTENT is the target path. A link to
+  // a home directory therefore publishes that path verbatim, in plain text, in
+  // the object database. Following the link reads the wrong bytes; skipping it
+  // — which is what the walk did — reads none at all.
+  const target = abs('Users', USER, 'Projects', 'flowly', 'notes.md');
+  const root = gitSandbox({ 'docs/guide.md': 'prose\n' }, { symlinks: { 'docs/notes.md': target } });
+  const out = run(root);
+  assert.equal(out.status, 1, `the target path IS the blob\n--- output ---\n${out.stdout}`);
+  assert.match(out.stdout, new RegExp(`docs/notes\\.md:1`));
+  assert.match(out.stdout, new RegExp(USER));
+});
+
+test('and an ordinary relative symlink is still clean', () => {
+  const root = gitSandbox(
+    { 'docs/guide.md': 'prose\n' },
+    { symlinks: { 'docs/alias.md': '../docs/guide.md' } },
+  );
+  const out = run(root);
+  assert.equal(out.status, 0, `a relative target discloses nothing\n${out.stdout}`);
+});
+
+test('CI cannot silently degrade to the filesystem walk', () => {
+  // The sharp edge of switching enumerations. A fall back that reports PASSED
+  // over a different, smaller set is worse than no check: it is the same green
+  // with none of the coverage. In CI there is always a work tree, so a missing
+  // one means the checkout or the working directory is wrong, and the only
+  // safe answer is to refuse.
+  const out = run(sandbox({ 'docs/guide.md': 'ordinary prose\n' }), { CI: 'true' });
+  assert.equal(out.status, 1, `a non-repository under CI must not report PASSED\n${out.stdout}`);
+  assert.match(out.stdout + out.stderr, /not a git work tree/i);
+});
+
+test('and a real repository under CI passes, on the git enumeration', () => {
+  // The control. Without it the test above is satisfied by a checker that
+  // refuses everything under CI.
+  const out = run(gitSandbox({ 'docs/guide.md': 'ordinary prose\n' }), { CI: 'true' });
+  assert.equal(out.status, 0, out.stdout);
+  assert.match(out.stdout, /^enumeration: git ls-files\b/m);
+});
+
+test('--require-git says the same thing without an environment variable', () => {
+  // CI is detected from the environment so that no workflow file has to change
+  // for the guarantee to hold. The flag is the explicit form, for a wrapper
+  // that wants the guarantee without pretending to be CI.
+  const plain = spawnSync(
+    process.execPath, [CHECKER, '--root', sandbox({ 'docs/guide.md': 'prose\n' }), '--require-git'],
+    { encoding: 'utf8', env: { ...process.env, CI: '' } },
+  );
+  assert.equal(plain.status, 1, plain.stdout);
+  assert.match(plain.stdout + plain.stderr, /not a git work tree/i);
+});
+
+// ── credentials ───────────────────────────────────────────────────────────
+//
+// The checker had no concept of a secret, and GitHub's push protection does not
+// know Flowly's own token prefix. Same one-way door: a credential in a public
+// commit is spent the moment it lands, and the only real remedy is rotation.
+//
+// FIXTURES — the same rule as the hosts above, one notch tighter. No literal
+// token-shaped string appears in this file: a prefix is spelled as its parts
+// and the body is GENERATED, so nothing written here is a string the rule it
+// tests would refuse.
+const pfx = (...parts) => parts.join('');
+/**
+ * A high-entropy body of `n` characters, built rather than typed. The step of 7
+ * is coprime with the 36-character alphabet, so the result walks every
+ * character before repeating any — which is what keeps these fixtures clear of
+ * the low-entropy placeholder shapes the checker deliberately allows.
+ */
+const entropy = (n, alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789') =>
+  Array.from({ length: n }, (_, i) => alphabet[(i * 7 + 5) % alphabet.length]).join('');
+const upperEntropy = n => entropy(n, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789');
+
+test('refuses a credential of every shape the door hands out', () => {
+  const tokens = [
+    // Flowly's own two, which no third-party scanner has ever heard of.
+    pfx('flo', '_', 'pat', '_') + entropy(32),
+    pfx('flo', '_', 'oat', '_') + entropy(32),
+    // GitHub: the four classic prefixes and the fine-grained form.
+    pfx('ghp', '_') + entropy(36),
+    pfx('gho', '_') + entropy(36),
+    pfx('ghu', '_') + entropy(36),
+    pfx('ghs', '_') + entropy(36),
+    pfx('github', '_', 'pat', '_') + entropy(22) + '_' + entropy(59),
+    // Anthropic and the OpenAI-style generic.
+    pfx('sk', '-', 'ant', '-') + 'api03' + '-' + entropy(40),
+    pfx('sk', '-') + entropy(48),
+    // AWS long-term and temporary access key ids.
+    pfx('AKIA') + upperEntropy(16),
+    pfx('ASIA') + upperEntropy(16),
+    // Slack, Google, GitLab, npm.
+    ...['b', 'a', 'p', 'r', 's'].map(c => pfx('xox', c, '-') + entropy(12) + '-' + entropy(24)),
+    pfx('AIza') + entropy(35),
+    pfx('glpat', '-') + entropy(20),
+    pfx('npm', '_') + entropy(36),
+  ];
+  for (const token of tokens) {
+    const out = refuses(`Set the token to ${token} in your config.\n`, `${token.slice(0, 8)}… is a credential`);
+    assert.match(out, /\[credential\]/);
+  }
+});
+
+test('refuses a JWT, and allows the dotted things that are not one', () => {
+  const jwt = [pfx('eyJ') + entropy(30), entropy(40), entropy(43)].join('.');
+  refuses(`Authorization: Bearer ${jwt}\n`, 'a compact JWS is a bearer credential');
+  allows('Upgrade to 4.17.21 and pin 1.2.3 in the lockfile.\n', 'a semver is three dotted segments');
+  allows('Import org.springframework.boot.autoconfigure here.\n', 'so is a package name');
+});
+
+test('refuses a PEM private key block, and allows the public one', () => {
+  const pem = key => ['-'.repeat(5), 'BEGIN ', key, 'PRIVATE KEY', '-'.repeat(5)].join('');
+  for (const kind of ['', 'RSA ', 'EC ', 'DSA ', 'OPENSSH ', 'PGP ']) {
+    refuses(`${pem(kind)}\n`, `a ${kind || 'bare'} private key header`);
+  }
+  const pub = ['-'.repeat(5), 'BEGIN ', 'PUBLIC KEY', '-'.repeat(5)].join('');
+  allows(`${pub}\n`, 'a public key is published on purpose');
+});
+
+test('still allows a bare prefix written as teaching material', () => {
+  // This is not hypothetical: this repository is a corpus of security skills,
+  // and `skills/flowly-connect/SKILL.md` names both Flowly prefixes in a table
+  // so a reader can tell which of three credentials they are holding. A rule
+  // that fires on a prefix with no token behind it turns the repo red on its
+  // own correct documentation, and a gate that cries wolf gets deleted.
+  allows(`| A | OAuth | \`${pfx('flo', '_', 'oat', '_')}\` | nothing is copied |\n`, 'the shipped table');
+  allows(`| B | issued by hand | \`${pfx('flo', '_', 'pat', '_')}\` | it is scoped |\n`, 'and its twin');
+  allows(`A GitHub token starts with \`${pfx('ghp', '_')}\` today.\n`, 'a prefix is not a token');
+  allows(`Access key ids begin ${pfx('AKIA')} or ${pfx('ASIA')} in AWS.\n`, 'same, uppercase');
+  allows(`Anthropic keys carry the ${pfx('sk', '-', 'ant', '-')} prefix.\n`, 'same, hyphenated');
+});
+
+test('and still allows the ordinary words a prefix hides inside', () => {
+  // `sk-` is the sharpest of these: it is a substring of thirty-odd real lines
+  // in this tree — `planning-and-task-breakdown`, `risk-based`, `disk-backed`.
+  // The left boundary and the entropy requirement both have to hold.
+  allows('See planning-and-task-breakdown for the risk-based split.\n', 'sk- inside a word');
+  allows('The disk-backed cache and the task-scoped context window.\n', 'and inside two more');
+});
+
+test('the entropy floor is a gate, not decoration', () => {
+  // Surfaced by mutation: dropping each floor to one character killed no test,
+  // because every control above happened to be either a BARE prefix (nothing
+  // follows, so no floor is consulted) or a low-entropy placeholder (a
+  // different rule catches it first). Neither reaches the floor.
+  //
+  // These do. `pipeline`, `prefix` and `token` all have more than four distinct
+  // characters, so the placeholder rule does not apply to them, and each is a
+  // perfectly ordinary identifier that a config file or a scanner rule would
+  // contain. The only thing keeping them out of the report is LENGTH — so each
+  // pair is the same prefix taken to both sides of its own floor.
+  allows(`Name it "${pfx('sk', '-')}pipeline" in the config.\n`, 'eight characters is not a key');
+  refuses(`Name it "${pfx('sk', '-')}${entropy(20)}" in the config.\n`, 'twenty of them is');
+
+  allows(`The ${pfx('flo', '_', 'pat', '_')}prefix constant holds it.\n`, 'six is not a token');
+  refuses(`The token is ${pfx('flo', '_', 'pat', '_')}${entropy(16)} here.\n`, 'sixteen is');
+
+  allows(`Match the ${pfx('ghp', '_')}token variable in your scanner.\n`, 'five is not a token');
+  refuses(`Match the ${pfx('ghp', '_')}${entropy(36)} value instead.\n`, 'thirty-six is');
+});
+
+test('and the left boundary is a second gate the floor does not subsume', () => {
+  // Also surfaced by mutation: removing the boundary killed nothing, because
+  // every `sk-`-inside-a-word fixture above is short enough that the floor
+  // stops it anyway. That is an accident of those words. Kebab-case carries
+  // long unbroken segments all the time — this repo's own directory names are
+  // made of them — and once the tail passes twenty characters the floor has
+  // nothing left to say. The boundary is what distinguishes a word from a
+  // prefix, and it needs its own reader.
+  allows('See the risk-basedprioritisationmatrix section.\n', 'a word that ends in sk-');
+  refuses(`See ${pfx('sk', '-')}basedprioritisationmatrix instead.\n`, 'the same tail, at a boundary');
+});
+
+test('allows the placeholder spellings documentation actually uses', () => {
+  // The other half of the entropy rule. A token-shaped string with no entropy
+  // is a teaching device, not a credential, and every security guide is full of
+  // them. `AKIAIOSFODNN7EXAMPLE` is AWS's own published example key.
+  allows(`Set GITHUB_TOKEN=${pfx('ghp', '_')}${'x'.repeat(36)} in your shell.\n`, 'x-filled');
+  allows(`AWS documents ${pfx('AKIA')}IOSFODNN7EXAMPLE as its example.\n`, 'the published example');
+  allows(`Use ${pfx('flo', '_', 'pat', '_')}${'0'.repeat(32)} as a stand-in.\n`, 'zero-filled');
+});
+
+test('the report names the credential without reprinting it', () => {
+  // A CI log is the one place a leaked secret is hardest to scrub, and this
+  // check's whole output goes there. So the finding has to be actionable
+  // without being a second copy: the prefix locates it, the length identifies
+  // it, and the body stays out of the log.
+  const body = entropy(36);
+  const out = refuses(`token = ${pfx('ghp', '_')}${body}\n`, 'a real-shaped token');
+  assert.match(out, /\[credential\]/);
+  assert.match(out, new RegExp(esc(pfx('ghp', '_'))));
+  assert.ok(!out.includes(body), `the body must not be echoed into the log\n${out}`);
+});
+
+test('a credential is refused wherever it lands, fence or source file', () => {
+  // Unlike the bare-token rule, this one has no prose gate to earn. A secret in
+  // a masked TypeScript fence, or in a `.ts` file, is exactly as published.
+  const token = pfx('ghp', '_') + entropy(36);
+  refuses(`${FENCE}typescript\nconst t = "${token}";\n${FENCE}\n`, 'a masked fence is not a shelter');
+  refuses(`const t = "${token}";\n`, 'nor is a program-source extension', 'src/config.ts');
 });
