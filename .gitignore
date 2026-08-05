@@ -5,5 +5,9 @@ node_modules/
 *.log
 .claude/.simplify-ignore-cache/
 .claude/sdd-cache/
+# Per-machine agent scratch state, not a shipped asset. It records absolute
+# paths from whoever's checkout it was written in, and this repository is public
+# from its first commit — check-no-hosts.js caught exactly that on 2026-08-05.
+.claude/agent-memory/
 evals/results/
 __pycache__/
