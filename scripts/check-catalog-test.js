@@ -28,6 +28,12 @@ const test = require('node:test');
 const CHECKER = path.join(__dirname, 'check-catalog.js');
 const CATALOG = 'flowly-catalog';
 
+const GAP_TEMPLATE = path.join('.github', 'ISSUE_TEMPLATE', 'skill-gap.yml');
+
+// Must match GAP_ESCAPE_HATCH in check-catalog.js, and restated for the same
+// reason as the conventions below.
+const ESCAPE_HATCH = 'other / not sure';
+
 // Must match REQUIRED_CONVENTIONS in check-catalog.js. Restated here rather
 // than imported: the script is a CLI with no exports, and a test that borrowed
 // the constant could not tell a renamed heading from a renamed requirement.
@@ -84,19 +90,61 @@ function catalogMarkdown(rows, conventions = CONVENTIONS, indexHeading = '## Ski
 }
 
 /**
- * A sandbox whose skills tree exactly matches the catalog it is given.
- * `rows` doubles as the directory list unless `dirs` overrides it, so the
- * default state of every case is consistent and green.
+ * Render a gap-report issue form whose `id: skill` dropdown offers exactly
+ * `options`. `before` prepends further body items, which is how the scoping
+ * case gives the template a second dropdown with a second `options:` list.
  */
-function makeSandbox({ rows = BASE_ROWS, dirs = null, catalog = null } = {}) {
+function gapTemplateYaml(options, { dropdownId = 'skill', before = [] } = {}) {
+  return [
+    'name: Skill gap',
+    'description: Report when a skill did not work.',
+    'body:',
+    ...before,
+    '  - type: dropdown',
+    `    id: ${dropdownId}`,
+    '    attributes:',
+    '      label: Affected skill',
+    '      description: Which skill did not work as expected?',
+    '      options:',
+    ...options.map(o => `        - ${o}`),
+    '    validations:',
+    '      required: true',
+  ].join('\n');
+}
+
+/**
+ * A sandbox whose skills tree exactly matches the catalog AND the gap template
+ * it is given. `rows` doubles as the directory list unless `dirs` overrides it,
+ * so the default state of every case is consistent and green.
+ *
+ * The template is derived from the tree the sandbox actually builds — including
+ * the catalog's own directory, which is written whether or not it is in `rows`.
+ * Deriving it is what keeps every pre-existing case above measuring the one
+ * thing it breaks: a case that adds a stray directory to test the catalog would
+ * otherwise fail the template check too, and its error count with it.
+ */
+function makeSandbox({ rows = BASE_ROWS, dirs = null, catalog = null, template = null } = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'flowly-check-catalog-test-'));
   fs.mkdirSync(path.join(root, 'scripts'), { recursive: true });
   fs.copyFileSync(CHECKER, path.join(root, 'scripts', 'check-catalog.js'));
-  for (const name of dirs === null ? rows.map(r => r[1]) : dirs) writeSkill(root, name);
+  const dirList = dirs === null ? rows.map(r => r[1]) : dirs;
+  for (const name of dirList) writeSkill(root, name);
   const body = catalog === null ? catalogMarkdown(rows) : catalog;
   fs.mkdirSync(path.join(root, 'skills', CATALOG), { recursive: true });
   fs.writeFileSync(path.join(root, 'skills', CATALOG, 'SKILL.md'), `${body}\n`);
+
+  const offered = [...new Set([...dirList, CATALOG])].sort();
+  fs.mkdirSync(path.join(root, path.dirname(GAP_TEMPLATE)), { recursive: true });
+  fs.writeFileSync(
+    path.join(root, GAP_TEMPLATE),
+    `${template === null ? gapTemplateYaml([...offered, ESCAPE_HATCH]) : template}\n`,
+  );
   return root;
+}
+
+/** The options a green sandbox's template carries, for a case to then break. */
+function defaultOptions(dirs = BASE_ROWS.map(r => r[1])) {
+  return [...[...new Set([...dirs, CATALOG])].sort(), ESCAPE_HATCH];
 }
 
 function run(root) {
@@ -119,6 +167,10 @@ test('passes when the catalog and the tree name the same set', () => {
   assert.equal(result.status, 0, result.stdout + result.stderr);
   assert.match(result.stdout, /0 error\(s\) — PASSED/);
   assert.match(result.stdout, /7 skill\(s\) named, 7 on disk/);
+  // The template block ran and passed, rather than being silently absent — and
+  // `other / not sure` was tolerated, which is the allowed half of the one
+  // exemption this script carries.
+  assert.match(result.stdout, /✓ {2}every skill is offered by the gap report template — 7 skill\(s\) offered, 7 on disk/);
 });
 
 // ─── Direction A: named in the catalog, absent from the tree ─────────────────
@@ -184,6 +236,132 @@ test('direction B: a dotted directory is not a skill', () => {
   const result = run(root);
 
   assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+// ─── The gap report template ─────────────────────────────────────────────────
+//
+// The same bidirectional shape as the catalog, one file over, and it drifted
+// for the reason a hand-maintained list always does: nine skills shipped and
+// nothing read the list they were meant to be added to.
+
+test('gap template: fails when a skill on disk is not offered', () => {
+  const root = makeSandbox({
+    template: gapTemplateYaml(defaultOptions().filter(o => o !== 'alpha-review')),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /in the tree, missing from the gap template dropdown: skills\/alpha-review/);
+});
+
+test('gap template: fails when an option names no skill', () => {
+  const root = makeSandbox({
+    template: gapTemplateYaml([...defaultOptions().filter(o => o !== ESCAPE_HATCH), 'alpha-invented'].sort().concat(ESCAPE_HATCH)),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /offered by the gap template, no `skills\/alpha-invented\/SKILL\.md`/);
+});
+
+test('gap template: the escape hatch is excused from resolving, but not from existing', () => {
+  // The other half of the positive control above: the exemption is only sound
+  // while the option it excuses is still in the form. Deleting it would retire
+  // a rule this script states and nothing else does.
+  const root = makeSandbox({
+    template: gapTemplateYaml(defaultOptions().filter(o => o !== ESCAPE_HATCH)),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /the gap template offers no `other \/ not sure` option/);
+});
+
+test('gap template: fails when an option is offered twice', () => {
+  const root = makeSandbox({
+    template: gapTemplateYaml(defaultOptions().flatMap(o => (o === 'alpha-build' ? [o, o] : [o]))),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /offered 2 times by the gap template/);
+});
+
+test('gap template: fails when the options are not in alphabetical order', () => {
+  const options = defaultOptions();
+  const i = options.indexOf('alpha-define');
+  const scrambled = [...options];
+  [scrambled[i], scrambled[i + 1]] = [scrambled[i + 1], scrambled[i]];
+  const root = makeSandbox({ template: gapTemplateYaml(scrambled) });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /not in alphabetical order — `alpha-plan` is out of place/);
+});
+
+test('gap template: fails when the dropdown carrying the list is renamed', () => {
+  const root = makeSandbox({
+    template: gapTemplateYaml(defaultOptions(), { dropdownId: 'affected' }),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /no `- type: dropdown` with `id: skill`/);
+});
+
+test('gap template: a second dropdown\'s options do not feed the parser', () => {
+  // The scoping property. Were the parse file-wide, this list would answer for
+  // the skill list — and both directions would then report on names nobody
+  // offered while the real dropdown went unread.
+  const root = makeSandbox({
+    template: gapTemplateYaml(defaultOptions(), {
+      before: [
+        '  - type: dropdown',
+        '    id: area',
+        '    attributes:',
+        '      label: Area',
+        '      options:',
+        '        - alpha-ghost',
+        '        - not-a-skill-at-all',
+      ],
+    }),
+  });
+
+  const result = run(root);
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('gap template: a comment or a blank line inside the list does not end it', () => {
+  // Both appear in the real template's neighbourhood, and a parser that treated
+  // either as the end of the list would drop every entry below it and blame
+  // those skills for a line it stopped reading at.
+  const options = defaultOptions();
+  const yaml = gapTemplateYaml(options).replace(
+    '        - alpha-plan',
+    ['        # the plan phase', '', '        - alpha-plan'].join('\n'),
+  );
+  const root = makeSandbox({ template: yaml });
+
+  const result = run(root);
+
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
+
+test('gap template: fails when the template is missing entirely', () => {
+  const root = makeSandbox();
+  fs.rmSync(path.join(root, GAP_TEMPLATE));
+
+  const result = run(root);
+
+  assert.equal(result.status, 1, result.stdout + result.stderr);
+  assert.match(result.stdout, /no gap report template at \.github\/ISSUE_TEMPLATE\/skill-gap\.yml/);
 });
 
 // ─── Phases ──────────────────────────────────────────────────────────────────

@@ -97,7 +97,7 @@ One point worth internalizing rather than looking up: when writing trigger promp
 - [ ] Tier 1 green: `node scripts/validate-skills.js`
 - [ ] Tier 2 green: `node scripts/run-evals.js`
 - [ ] Hook test green if you touched `hooks/` or `flowly-catalog`
-- [ ] Catalog gate green: `node scripts/check-catalog.js` — a new skill needs a row in the catalog's index
+- [ ] Catalog gate green: `node scripts/check-catalog.js` — a new skill needs a row in the catalog's index *and* an entry in the gap form's dropdown
 - [ ] New skill → eval case file present with the minimum trigger/behavioral counts
 - [ ] New skill → gap justified in the PR description; catalog and open PRs checked
 - [ ] No duplicated content; cross-references used instead

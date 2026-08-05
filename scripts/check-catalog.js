@@ -2,13 +2,18 @@
 /**
  * check-catalog.js
  *
- * CLI that holds the skill catalog — `skills/flowly-catalog/SKILL.md` — to the
- * skills tree it claims to route across. The catalog is the one document whose
- * whole job is to be a list of other things, which makes it the one document
- * that is wrong the moment anything else moves, and the one whose wrongness
- * nothing else can see.
+ * CLI that holds this repository's hand-maintained lists of skills to the
+ * skills tree they claim to cover. There are two, and they have the same
+ * relationship to `skills/`: they are documents whose whole job is to be a list
+ * of other things, which makes them the documents that are wrong the moment
+ * anything else moves, and the ones whose wrongness nothing else can see.
  *
- * The two ways it goes wrong are not symmetrical, and both are silent:
+ *   - `skills/flowly-catalog/SKILL.md` § Skill Index — the router an agent is
+ *     meant to arrive through.
+ *   - `.github/ISSUE_TEMPLATE/skill-gap.yml` § the `id: skill` dropdown — the
+ *     one route a user has to report that a skill's guidance was wrong.
+ *
+ * The two ways the catalog goes wrong are not symmetrical, and both are silent:
  *
  *   - A skill NAMED in the catalog that does not exist sends an agent to open
  *     nothing. Having been told a skill governs this task, it does not conclude
@@ -35,6 +40,9 @@
  *   2. Direction A — every skill named in the catalog resolves to a real
  *      `skills/<name>/SKILL.md`.
  *   3. Direction B — every directory under `skills/` is named in the catalog.
+ *   3a. The gap template's dropdown offers exactly the same set, both ways: a
+ *      skill on disk it cannot name has no route to a bug report, and an entry
+ *      naming no skill routes a report at nothing.
  *   4. Every row's phase is one of the six this distribution ships, or the
  *      cross-cutting label, and all six phases appear. "Routes across the six
  *      phases" is otherwise a claim about a document nobody re-reads.
@@ -52,6 +60,19 @@
  * B inconvenient. Naming itself costs one row and leaves the rule absolute:
  * the table and the tree are the same set, with nothing excused from either
  * direction.
+ *
+ * WHY AN ISSUE TEMPLATE IS CHECKED BY A FILE CALLED check-catalog
+ * ---------------------------------------------------------------
+ * Because it is the same assertion about the same tree, and the alternative was
+ * a second script that would have to re-derive `skills/`, re-state the two
+ * directions and re-state the counting discipline below. The dropdown drifted
+ * for the exact reason the catalog would have: nine skills shipped and nobody
+ * hand-edited a list that nothing read. One reader for both lists is one place
+ * to look when a skill is added.
+ *
+ * What this file is is the reader for every hand-maintained enumeration of the
+ * skills tree. If a third one appears, it belongs here too — and if that stops
+ * being true, this header is the thing to fix first.
  *
  * Usage:   node scripts/check-catalog.js
  * Exit codes: 0 = all clear, 1 = one or more errors
@@ -73,6 +94,26 @@ const CATALOG_PATH  = path.join(REPO_ROOT, CATALOG_FILE);
 
 const INDEX_HEADING       = 'Skill Index';
 const CONVENTIONS_HEADING = 'Flowly Conventions';
+
+const GAP_FILE = '.github/ISSUE_TEMPLATE/skill-gap.yml';
+const GAP_PATH = path.join(REPO_ROOT, GAP_FILE);
+
+// The dropdown this reads, by its `id`. GitHub's issue-form schema allows any
+// number of dropdowns in one body, each with its own `options:`; naming the id
+// is what stops this parser answering with some other list — a severity, an
+// ecosystem, whatever the form grows next.
+const GAP_DROPDOWN_ID = 'skill';
+
+// The one option that is deliberately not a skill. The dropdown is `required`,
+// so a form with no escape hatch makes a user whose gap is not in any single
+// skill — a command, a hook, the install path — name one at random, and a report
+// filed against the wrong skill is worse than one filed against none.
+//
+// It is an exemption, so it is asserted in both directions: an option that is
+// not this string must resolve to a skill, AND this string must still be
+// offered. An exemption whose subject has been deleted is a hole in a rule that
+// nothing else reads.
+const GAP_ESCAPE_HATCH = 'other / not sure';
 
 // The six lifecycle phases, in order. Same list, same order as the six commands
 // in check-commands.js and the phase map in CLAUDE.md — this is the shape the
@@ -197,6 +238,114 @@ function parseIndex(lines) {
   return { rows, errors };
 }
 
+// ─── Issue-form parsing ──────────────────────────────────────────────────────
+//
+// Line-based and scoped, for the reason the markdown above is: this repository
+// is plain Node with no dependencies and no build step, and a YAML parser would
+// be the first one — bought to read twenty lines of a file whose shape is fixed
+// by GitHub's own schema. What is read is narrow on purpose: the `options:` of
+// ONE dropdown, found by its `id`, with everything outside that item invisible.
+
+const YAML_ITEM_RE  = /^(\s*)-\s+type:\s*(\S+)\s*$/;
+const YAML_KEY_RE   = /^(\s*)([A-Za-z_][\w-]*):\s*(.*?)\s*$/;
+const YAML_ENTRY_RE = /^(\s*)-\s+(.*?)\s*$/;
+
+/** Strip one wrapping pair of quotes from a scalar; both forms mean the same. */
+function unquoted(value) {
+  const m = /^(["'])(.*)\1$/.exec(value);
+  return m === null ? value : m[2];
+}
+
+/**
+ * The template's body items, each running from its `- type:` line to the next
+ * one at the same indent. `fieldIndent` is the column the item's own keys sit
+ * at, so `id` can be read from the item rather than from anything nested under
+ * it.
+ */
+function bodyItems(lines) {
+  const starts = [];
+  let indent = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = YAML_ITEM_RE.exec(lines[i]);
+    if (m === null) continue;
+    if (indent === null) indent = m[1];
+    if (m[1] === indent) starts.push({ at: i, type: m[2], fieldIndent: m[1].length + 2 });
+  }
+
+  return starts.map((s, n) => ({
+    type: s.type,
+    fieldIndent: s.fieldIndent,
+    lines: lines.slice(s.at + 1, n + 1 < starts.length ? starts[n + 1].at : lines.length),
+  }));
+}
+
+/**
+ * The `options:` of the `id: <GAP_DROPDOWN_ID>` dropdown, in file order.
+ *
+ * Only the block form (`- one entry per line`) is read. A flow list is rejected
+ * loudly rather than parsed, because the alternative is reading nothing and
+ * reporting every skill on disk as missing — a red run that blames 33 skills
+ * for one line's syntax.
+ */
+function parseGapOptions(lines) {
+  const errors = [];
+
+  const dropdowns = bodyItems(lines).filter(item => item.type === 'dropdown' && item.lines.some(l => {
+    const m = YAML_KEY_RE.exec(l);
+    return m !== null && m[1].length === item.fieldIndent && m[2] === 'id' && unquoted(m[3]) === GAP_DROPDOWN_ID;
+  }));
+
+  if (dropdowns.length === 0) {
+    errors.push(`no \`- type: dropdown\` with \`id: ${GAP_DROPDOWN_ID}\` in ${GAP_FILE}`);
+    errors.push('  ↳ the id is what this check finds the list by. Renaming it does not remove the list, it removes its reader.');
+    return { options: [], errors };
+  }
+  if (dropdowns.length > 1) {
+    errors.push(`${dropdowns.length} dropdowns with \`id: ${GAP_DROPDOWN_ID}\` in ${GAP_FILE} — there must be exactly one`);
+  }
+
+  const item = dropdowns[0];
+  let optionsAt     = -1;
+  let optionsIndent = 0;
+
+  for (let i = 0; i < item.lines.length; i++) {
+    const m = YAML_KEY_RE.exec(item.lines[i]);
+    if (m === null || m[2] !== 'options') continue;
+    if (m[3] !== '') {
+      errors.push(`the \`id: ${GAP_DROPDOWN_ID}\` dropdown's \`options:\` is not a block list: ${item.lines[i].trim()}`);
+      errors.push('  ↳ one `- <skill>` per line, alphabetical — the form this check reads and the form a diff of it is reviewable in.');
+      return { options: [], errors };
+    }
+    optionsAt     = i;
+    optionsIndent = m[1].length;
+    break;
+  }
+
+  if (optionsAt === -1) {
+    errors.push(`the \`id: ${GAP_DROPDOWN_ID}\` dropdown in ${GAP_FILE} has no \`options:\` list`);
+    return { options: [], errors };
+  }
+
+  const options = [];
+  for (let i = optionsAt + 1; i < item.lines.length; i++) {
+    const trimmed = item.lines[i].trim();
+    // A blank line or a comment inside the list is not the end of it. Treating
+    // either as a terminator would drop every entry below it, and the report
+    // would blame those skills rather than the line that stopped the read.
+    if (trimmed === '' || trimmed.startsWith('#')) continue;
+    const m = YAML_ENTRY_RE.exec(item.lines[i]);
+    if (m === null || m[1].length <= optionsIndent) break;
+    options.push(unquoted(m[2]));
+  }
+
+  if (options.length === 0) {
+    errors.push(`the \`id: ${GAP_DROPDOWN_ID}\` dropdown's \`options:\` list is empty`);
+  }
+
+  return { options, errors };
+}
+
 /** Every directory directly under `skills/`, sorted. Dotfiles are not skills. */
 function skillDirectories(skillsDir) {
   if (!fs.existsSync(skillsDir)) return [];
@@ -270,6 +419,88 @@ function checkTreeIsNamed(rows, dirs, report) {
     errors,
     'every skill directory is named in the catalog',
     `${dirs.length} director(y/ies) under skills/, all present in the index`,
+  );
+  return countFailures(errors);
+}
+
+/**
+ * The gap template's dropdown offers exactly the skills tree, plus the escape
+ * hatch.
+ *
+ * ONE BLOCK, NOT TWO. The catalog's directions get a block each because their
+ * consequences are different enough to want separate messages a reader can act
+ * on alone. Here they are one failure with two faces — the dropdown and the
+ * tree disagree — and splitting them would put two blocks in the report for a
+ * list that is edited in one place. The two messages still say which way round
+ * it is; the fix is the same file either way.
+ */
+function checkGapTemplate(dirs, report) {
+  const errors = [];
+
+  if (!fs.existsSync(GAP_PATH)) {
+    errors.push(`no gap report template at ${GAP_FILE}`);
+    errors.push('  ↳ it is the only route a user has to tell us a skill was wrong. Without it the report arrives as free text against nothing, or not at all.');
+    report(errors, 'every skill is offered by the gap report template', '');
+    return countFailures(errors);
+  }
+
+  const { options, errors: parseErrors } = parseGapOptions(fs.readFileSync(GAP_PATH, 'utf8').split('\n'));
+  errors.push(...parseErrors);
+
+  const counted = new Map();
+  for (const option of options) counted.set(option, (counted.get(option) || 0) + 1);
+
+  for (const [option, n] of counted) {
+    if (n > 1) {
+      errors.push(`offered ${n} times by the gap template, must appear exactly once: ${option}`);
+    }
+  }
+
+  // Guarded on a list that was actually read: an unparseable `options:` has
+  // already reported why, and "no escape hatch" on top of it points at the
+  // wrong line.
+  if (options.length > 0 && !counted.has(GAP_ESCAPE_HATCH)) {
+    errors.push(`the gap template offers no \`${GAP_ESCAPE_HATCH}\` option`);
+    errors.push('  ↳ this check excuses that entry from naming a skill, so deleting it retires an exemption in silence — and leaves a required dropdown that forces a wrong answer.');
+  }
+
+  // Everything else must be a skill. The escape hatch is the only string in the
+  // list that is allowed not to be one.
+  const named = [...counted.keys()].filter(o => o !== GAP_ESCAPE_HATCH);
+
+  const unresolved = named.filter(o => !fs.existsSync(path.join(SKILLS_DIR, o, 'SKILL.md')));
+  for (const option of unresolved) {
+    errors.push(`offered by the gap template, no \`skills/${option}/SKILL.md\`: ${option}`);
+  }
+  if (unresolved.length > 0) {
+    errors.push('  ↳ fix the entry, or delete it. A report filed against a skill that does not exist is triaged against nothing, by a user who did everything the form asked.');
+  }
+
+  const offered = new Set(named);
+  const unlisted = dirs.filter(d => !offered.has(d));
+  for (const dir of unlisted) {
+    errors.push(`in the tree, missing from the gap template dropdown: skills/${dir}`);
+  }
+  if (unlisted.length > 0) {
+    errors.push(`  ↳ add it to the \`options:\` of the \`id: ${GAP_DROPDOWN_ID}\` dropdown in ${GAP_FILE}, in alphabetical order.`);
+    errors.push('  ↳ a gap in a skill the form cannot name is filed against something else or not filed at all — either way the skill it belongs to is never told.');
+  }
+
+  // The list is maintained by hand and read as one. Sorted is what makes a
+  // missing entry visible to a reviewer, and unsorted is what an append at the
+  // bottom — the way the nine `flowly-` skills would have been added — looks
+  // like.
+  const sorted = [...named].sort();
+  const outOfPlace = named.find((o, i) => o !== sorted[i]);
+  if (outOfPlace !== undefined) {
+    errors.push(`the gap template's skill options are not in alphabetical order — \`${outOfPlace}\` is out of place`);
+    errors.push(`  ↳ \`${GAP_ESCAPE_HATCH}\` is not part of this order — it is filtered out first, and sits last in the form. Everything else sorts.`);
+  }
+
+  report(
+    errors,
+    'every skill is offered by the gap report template',
+    `${named.length} skill(s) offered, ${dirs.length} on disk, alphabetical, plus \`${GAP_ESCAPE_HATCH}\``,
   );
   return countFailures(errors);
 }
@@ -348,11 +579,12 @@ function main() {
     }
   };
 
-  console.log(`Skill catalog — ${CATALOG_FILE} § ${INDEX_HEADING}\n`);
+  console.log('Skill lists — the catalog index and the gap report dropdown\n');
 
   const dirs = skillDirectories(SKILLS_DIR);
 
-  console.log(`  Catalog:  ${CATALOG_FILE}`);
+  console.log(`  Catalog:  ${CATALOG_FILE} § ${INDEX_HEADING}`);
+  console.log(`  Template: ${GAP_FILE} § the \`id: ${GAP_DROPDOWN_ID}\` dropdown`);
   console.log(`  Tree:     skills/ — ${dirs.length} director(y/ies)`);
   console.log(`  Phases:   ${PHASES.join(', ')} (+ ${CROSS_PHASE})\n`);
 
@@ -375,6 +607,7 @@ function main() {
 
   errorCount += checkNamedResolve(rows, report);
   errorCount += checkTreeIsNamed(rows, dirs, report);
+  errorCount += checkGapTemplate(dirs, report);
   errorCount += checkPhases(rows, report);
   errorCount += checkConventions(lines, report);
 

@@ -268,7 +268,7 @@ which is the only reason to believe it works:
 | `node scripts/check-no-hosts.js` | No hostname outside a curated allowlist, and no absolute workspace path, anywhere in the tree | Any new hostname appears |
 | `node scripts/check-register.js` | Every shipped file is registered exactly once, the base SHA is an ancestor of `HEAD`, and every `unchanged` file really is byte-identical to it | A file is added without a register row |
 | `node scripts/check-binding.js` | No shipped file names a planning destination this distribution does not have, and every rebound file names the Flowly capability that replaced it | A skill is rebound by deleting a path without naming its successor |
-| `node scripts/check-catalog.js` | `flowly-catalog` and the skills tree name the same set, in both directions, across the six phases, and the shared Flowly conventions are still stated | A skill is added without a catalog row, or a catalog row names a skill that does not exist |
+| `node scripts/check-catalog.js` | every hand-maintained list of skills — `flowly-catalog`'s index and the gap report's dropdown — names the same set as the skills tree, in both directions, across the six phases, with the shared Flowly conventions still stated | A skill is added without a catalog row or without a gap-form entry, or either list names a skill that does not exist |
 
 `check-no-hosts.js` is the one that matters most. This repository is public, making a repository
 public later does not scrub its history, and GitHub's push protection matches credential patterns —

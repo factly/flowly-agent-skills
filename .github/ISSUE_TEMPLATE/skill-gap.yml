@@ -14,6 +14,9 @@ body:
     attributes:
       label: Affected skill
       description: Which skill did not work as expected?
+      # Every directory under skills/, alphabetically, then the escape hatch.
+      # `scripts/check-catalog.js` holds this list to the tree in both
+      # directions, so a skill that ships without an entry here turns it red.
       options:
         - api-and-interface-design
         - browser-testing-with-devtools
@@ -25,7 +28,16 @@ body:
         - deprecation-and-migration
         - documentation-and-adrs
         - doubt-driven-development
+        - flowly-build
         - flowly-catalog
+        - flowly-connect
+        - flowly-define
+        - flowly-loop-runs
+        - flowly-plan
+        - flowly-plan-gate
+        - flowly-review
+        - flowly-ship
+        - flowly-verify
         - frontend-ui-engineering
         - git-workflow-and-versioning
         - idea-refine

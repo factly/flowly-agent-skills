@@ -42,7 +42,7 @@ Every new skill must have:
 - `SKILL.md` in the skill directory
 - YAML frontmatter with valid `name` and `description`
 - An eval case file at `evals/cases/<skill-name>.json` — at least 3 positive triggers, 2 negative triggers (with `owner` where possible), and 1 behavioral eval. Execution evals must be backed by real files under `evals/fixtures/`; conversation-shaped skills may use a reviewer-gated `kind: "dialogue"` eval instead (see [evals/README.md](evals/README.md)). CI enforces these requirements.
-- A row in the Skill Index of [`skills/flowly-catalog/SKILL.md`](skills/flowly-catalog/SKILL.md), naming the phase it belongs to. `scripts/check-catalog.js` holds the catalog and the skills tree to the same set in both directions, so a skill that ships without a row turns it red — and a skill nothing routes to is a skill nothing ever invokes.
+- A row in the Skill Index of [`skills/flowly-catalog/SKILL.md`](skills/flowly-catalog/SKILL.md), naming the phase it belongs to — and an entry in the `Affected skill` dropdown of [`.github/ISSUE_TEMPLATE/skill-gap.yml`](.github/ISSUE_TEMPLATE/skill-gap.yml), in alphabetical order. `scripts/check-catalog.js` holds both of those hand-maintained lists to the skills tree in both directions, so a skill that ships without either turns it red. A skill nothing routes to is a skill nothing ever invokes; a skill the gap form cannot name is one nobody can report a bug against.
 
 New skills should generally follow the standard anatomy:
 

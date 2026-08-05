@@ -185,7 +185,7 @@ what each one is actually watching:
 |---|---|
 | `check-register.js` | the base SHA was not advanced, or a file changed status without the row changing — the two ways the table stops describing the tree |
 | `check-binding.js` | upstream reverted a binding at one of the destinations it knows by name |
-| `check-catalog.js` | upstream added, renamed or removed a skill and the router did not follow — in either direction |
+| `check-catalog.js` | upstream added, renamed or removed a skill and a hand-maintained list of skills did not follow — the router's index or the gap form's dropdown, in either direction |
 | `validate-standard.sh` | upstream added a frontmatter field beyond `name` and `description`, which closes a door this fork keeps open |
 | `check-commands.js` | upstream started shipping at `commands/`, or introduced a substitution token in a command body |
 | `run-evals.js` | ranking is zero-sum — a skill upstream added or reworded re-scores **every** skill, so read the aggregate rank-1 number, not just the rows that changed |
