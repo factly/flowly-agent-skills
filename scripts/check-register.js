@@ -34,6 +34,12 @@
  *      *meant* to be rebound but never was reads as done forever. Only
  *      check 4 existed until the first rebinding landed, at which point
  *      every `bound` row in the table was an unverified claim.
+ *   6. `new` is ours and `owned` was theirs — a row marked `new` has no blob at
+ *      the base, and one marked `owned` has one. Checks 4 and 5 only look at
+ *      the other two statuses, which left relabelling as a silent way out of
+ *      both: measured, moving any row to `new` or `owned` made this script exit
+ *      0 without a word, and seventeen of fifty-four rows carried a status
+ *      nothing read.
  *
  * The base SHA and the upstream URL are parsed out of NOTICE.md rather than
  * hardcoded here. The register is the source of truth; this file is its reader.
@@ -297,8 +303,8 @@ function checkBaseSha(sha, report) {
  * which is the thing being checked.
  *
  * Only the native side is prefixed, deliberately. The open standard ties
- * frontmatter `name` to the directory name, so prefixing all 24 inherited
- * skills would edit every SKILL.md before any content change and put every
+ * frontmatter `name` to the directory name, so prefixing every inherited
+ * skill would edit each SKILL.md before any content change and put every
  * future merge on a renamed path — taxing the exact property that made a fork
  * cheaper than a generator. The collision that would prevent is a user
  * receiving our near-identical fork of a file they asked for.
@@ -406,6 +412,76 @@ function checkBound(rows, sha, upstream, report) {
   return countFailures(errors);
 }
 
+/**
+ * `new` and `owned` — the two statuses that were never verified.
+ *
+ * WHY THIS EXISTS
+ * ---------------
+ * The two comparisons above only look at rows marked `unchanged` or `bound`.
+ * That left relabelling as a silent escape hatch out of both: measured, moving
+ * any row to `new` or `owned` made this script exit 0 with no output about it,
+ * whichever status it came from. Seventeen of fifty-four rows carried a status
+ * nothing checked, and the loudest way to defeat the register was also the
+ * quietest — a one-word edit.
+ *
+ * NOTICE.md's own definitions are directly testable and are what is enforced:
+ *
+ *   `new`   — "Ours outright, with no upstream counterpart."  → must NOT exist
+ *             at the base SHA.
+ *   `owned` — "An inherited path we have taken over."         → MUST exist at
+ *             the base SHA.
+ *
+ * A useful side effect: `new` rows now pin the base SHA far harder than the
+ * ancestor test alone does. A SHA drifted forward past the commit that created
+ * our own files makes them exist at the base, and this check says so.
+ *
+ * WHAT IT STILL CANNOT SEE, AND WHY THAT IS NOT A BUG
+ * ---------------------------------------------------
+ * `bound` → `owned` on a non-skill path survives, and no git question can catch
+ * it. Both statuses describe a file that exists at the base and differs from it;
+ * they are distinguished only by intent — whether we still take upstream's
+ * updates — which leaves no trace in the object store.
+ *
+ * For skills the prefix rule closes it: check 2a already fails a `bound` skill
+ * relabelled `owned`, because `owned` demands the `flowly-` prefix. For
+ * `references/`, `agents/` and `commands/` there is no equivalent, and inventing
+ * one would mean inventing a naming convention purely so a checker could have
+ * something to read. The gap is named here rather than papered over.
+ */
+function checkNewAndOwned(rows, sha, report) {
+  const errors = [];
+  const isNew = rows.filter(r => r.status === 'new');
+  const owned = rows.filter(r => r.status === 'owned');
+
+  const existsAtBase = file => {
+    try {
+      git(['cat-file', '-e', `${sha}:${file}`], 'buffer');
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  for (const { file } of isNew) {
+    if (!existsAtBase(file)) continue;
+    errors.push(`marked new but exists at the base: ${file}`);
+    errors.push('  ↳ it has an upstream counterpart, so it is `owned` or `bound`, not `new`.');
+  }
+
+  for (const { file } of owned) {
+    if (existsAtBase(file)) continue;
+    errors.push(`marked owned but does not exist at the base: ${file}`);
+    errors.push('  ↳ there was no inherited path to take over — this is `new`.');
+  }
+
+  report(
+    errors,
+    '`new` is ours and `owned` was theirs',
+    `${isNew.length} new + ${owned.length} owned file(s) match their definition at the base`,
+  );
+  return countFailures(errors);
+}
+
 // ─── Main ────────────────────────────────────────────────────────────────────
 
 function main() {
@@ -475,9 +551,11 @@ function main() {
   if (sha !== null && /^[0-9a-f]{40}$/.test(sha) && gitOk(['rev-parse', '--verify', `${sha}^{commit}`])) {
     errorCount += checkUnchanged(rows, sha, upstream, report);
     errorCount += checkBound(rows, sha, upstream, report);
+    errorCount += checkNewAndOwned(rows, sha, report);
   } else {
     console.log('  –  `unchanged` really is unchanged — skipped, the base SHA above is unusable');
     console.log('  –  `bound` really is bound — skipped, the base SHA above is unusable');
+    console.log('  –  `new` is ours and `owned` was theirs — skipped, the base SHA above is unusable');
   }
 
   const status = errorCount > 0 ? 'FAILED' : 'PASSED';
