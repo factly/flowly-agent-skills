@@ -51,8 +51,19 @@ concurrency:
   # because those are the ones anyone later goes looking for.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Node 24 is the Active LTS (since 2025-10-28, supported to 2028-04-30).
+#
+# Pinned to a major rather than `lts/*` for the same reason every other version
+# in this repository is pinned: a floating pin turns someone else's release into
+# a surprise failure here. Move it on purpose, having read the changelog.
+#
+# It was '20' until this line changed, and 20 reached END OF LIFE on 2026-04-30
+# — so the first green CI run was green on an unsupported runtime, which is the
+# kind of thing a passing build is very good at hiding. GitHub's own annotation
+# is what surfaced it, and that annotation was about the ACTION's runtime, not
+# this value; the two are separate and both were stale.
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
 
 jobs:
   # ── Skill content ───────────────────────────────────────────────────────────
@@ -61,9 +72,9 @@ jobs:
     name: Skill anatomy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -74,7 +85,7 @@ jobs:
     name: Agent Skills open standard
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # This gate is one half of what holds the doors this fork does not ship
       # openable: frontmatter limited to `name` and `description`. See
@@ -107,9 +118,9 @@ jobs:
     name: No hostname or workspace path
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -126,9 +137,9 @@ jobs:
     name: Flowly binding
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -155,11 +166,11 @@ jobs:
       # upstream — are SKIPPED, not failed. Anyone who "fixed" the red by
       # relaxing the base-SHA assertion would get a green run with both
       # comparisons silently disabled forever.
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -195,9 +206,9 @@ jobs:
     name: Skill catalog
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -213,9 +224,9 @@ jobs:
     name: Lifecycle commands
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -228,9 +239,9 @@ jobs:
     name: Command references
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -252,9 +263,9 @@ jobs:
     name: Tool drift
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -279,9 +290,9 @@ jobs:
     name: Trigger and routing evals
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -297,9 +308,9 @@ jobs:
     name: Session hooks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -315,7 +326,7 @@ jobs:
     name: Plugin manifests (strict)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code
@@ -363,7 +374,7 @@ jobs:
     name: Install door
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install Claude Code
         run: npm install -g @anthropic-ai/claude-code

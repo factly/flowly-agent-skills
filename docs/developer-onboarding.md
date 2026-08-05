@@ -36,7 +36,7 @@ cd flowly-agent-skills
 
 There's no build step and no `package.json`; validators are plain Node scripts. You need:
 
-- **Node 20+** (what CI runs) for the `scripts/` validators
+- **Node 24+** (what CI runs — the Active LTS) for the `scripts/` validators
 - **bash** (3.2 or newer) for the hook regression test — the hook itself needs nothing else
 - **`gh` CLI** for the duplicate-PR check before proposing a skill
 - **Claude Code** only if you want to run Tier 3 behavioral evals locally
