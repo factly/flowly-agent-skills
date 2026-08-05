@@ -257,8 +257,8 @@ DU skills/using-agent-skills/SKILL.md
 
 That is the *clean* merge — the file nobody was asked to think about — and its hint recommends two
 fixes that are both wrong here (§ 6). Advancing the base SHA to the merged upstream commit returned
-all six register checks to green, and the other nine gates were green throughout, including
-`run-evals.js` at rank-1 85%.
+every register check to green, and every other gate was green throughout, including `run-evals.js`
+at rank-1 85%.
 
 The lesson is worth carrying: on a sync, the file that needs attention afterwards is not the one that
 conflicted. The conflict announced itself. The clean merge is what quietly made the register untrue.

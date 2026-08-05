@@ -104,7 +104,7 @@ Do not substitute `list_actors`: it answers who exists, not who you are.
 
 ### 5. Read the refusal before changing anything
 
-Every failure below has a different next action, and three of them are not credential problems at all. Match the signal first; rotating a credential by reflex fixes one row out of six.
+Every failure below has a different next action, and four of them are not credential problems at all. Match the signal first; rotating a credential by reflex fixes one row out of six.
 
 ## What a Refusal Means
 
