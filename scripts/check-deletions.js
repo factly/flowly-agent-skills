@@ -32,9 +32,30 @@
  *
  * Matching a path against NOTICE.md with a plain substring search over-reports
  * as covered. A row naming `docs/` would silently absolve every deletion under
- * `docs/`. So coverage is decided against the backticked paths inside the
- * § Removed at import section only, and a directory row covers a path only when
- * it is written with its trailing slash.
+ * `docs/`. So coverage is decided against the § Removed at import table only,
+ * and a directory row covers a path only when it is written with its trailing
+ * slash.
+ *
+ * WHY THE TABLE AND NOT THE SECTION
+ * ---------------------------------
+ * Scoping to the section was the mitigation above, and reading the section's
+ * PROSE defeated it. The section explains its removals at length, and prose
+ * about a removal names paths that were not removed: `skills/` appeared inside
+ * "opencode symlink into `skills/`" — a description of what a deleted symlink
+ * pointed AT — and `scripts/` inside "Its `scripts/` directory was empty
+ * afterwards". Harvested as records, each became a blanket over a whole
+ * subtree, and between them they absolved every validator and every skill in
+ * the repository. The gate stayed green over its own deletion.
+ *
+ * A removal record is therefore the FIRST COLUMN of the table, and nothing
+ * else. The second column describes and the surrounding prose argues; only the
+ * first column claims "this path is gone". That is also what makes the reported
+ * count mean something: a shell assignment written in the prose
+ * (`IDEAS_DIR="docs/ideas"`) is no longer counted as a path.
+ *
+ * The consequence is that a removal recorded only in prose does not count, so
+ * the records that lived there were moved into the table. That is the right
+ * direction: the table is what a merge resolver reads.
  *
  * Usage:  node scripts/check-deletions.js [--root <dir>]
  */
@@ -67,13 +88,22 @@ function removedSection(notice) {
 }
 
 /**
- * Paths recorded as removed. Only backticked tokens that look like a path
- * count — the section is prose, and every path in it is written in code marks.
+ * Paths recorded as removed: the backticked tokens in the FIRST COLUMN of the
+ * section's table, and nothing else. See the header — the section's prose names
+ * paths that are still here, and reading them absolves whole subtrees.
+ *
+ * The header row (`| Removed | Was |`) and the delimiter (`|---|---|`) carry no
+ * backticks, so neither needs a special case.
  */
 function recordedPaths(section) {
-  return [...section.matchAll(/`([^`]+)`/g)]
-    .map((m) => m[1])
-    .filter((p) => p.includes('/') || /\.(md|json|js|ya?ml|sh|toml)$/.test(p));
+  const paths = [];
+  for (const line of section.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('|')) continue;
+    const firstCell = trimmed.slice(1).split('|')[0];
+    for (const m of firstCell.matchAll(/`([^`]+)`/g)) paths.push(m[1]);
+  }
+  return paths;
 }
 
 function isCovered(file, recorded) {

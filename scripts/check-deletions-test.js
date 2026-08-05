@@ -33,6 +33,11 @@ function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
 }
 
+/** The § Removed at import table, which is the only thing that records. */
+function table(rows) {
+  return ['| Removed | Was |', '|---|---|', ...rows].join('\n');
+}
+
 function notice(sha, removedBody) {
   return [
     '# NOTICE',
@@ -49,7 +54,9 @@ function notice(sha, removedBody) {
     '',
     '## Statuses',
     '',
-    'Nothing here names a removed path: `never/removed.md`.',
+    // A TABLE in the next section, not prose. The section-scoping assertion is
+    // only load-bearing if the other section is the same shape this one reads.
+    table(['| `never/removed.md` | still here, recorded in the wrong section |']),
     '',
   ].join('\n');
 }
@@ -103,14 +110,14 @@ test('passes on the repository as it is checked in', () => {
 
 test('passes when every deletion is recorded', () => {
   const { root, sha } = makeRepo({ files: { 'a.md': 'a\n', 'docs/gone.md': 'x\n' }, remove: ['docs/gone.md'] });
-  writeNotice(root, sha, 'Removed: `docs/gone.md`.');
+  writeNotice(root, sha, table(['| `docs/gone.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
 
 test('passes when nothing was deleted at all', () => {
   const { root, sha } = makeRepo({ files: { 'a.md': 'a\n' }, add: { 'b.md': 'b\n' } });
-  writeNotice(root, sha, 'Removed: `placeholder/none.md`.');
+  writeNotice(root, sha, table(['| `placeholder/none.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
@@ -119,7 +126,7 @@ test('passes when nothing was deleted at all', () => {
 
 test('fails when a deletion is not recorded', () => {
   const { root, sha } = makeRepo({ files: { 'a.md': 'a\n', 'docs/gone.md': 'x\n' }, remove: ['docs/gone.md'] });
-  writeNotice(root, sha, 'Removed: `something/else.md`.');
+  writeNotice(root, sha, table(['| `something/else.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /docs\/gone\.md was deleted since the base but is not recorded/);
@@ -134,7 +141,7 @@ test('renames count as deletions', () => {
     remove: ['evals/old.md'],
     add: { 'evals/new.md': body },
   });
-  writeNotice(root, sha, 'Removed: `nothing/here.md`.');
+  writeNotice(root, sha, table(['| `nothing/here.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 1, 'a renamed-away file must still count as deleted');
   assert.match(result.stdout, /evals\/old\.md was deleted/);
@@ -145,7 +152,7 @@ test('a directory row with its trailing slash covers files beneath it', () => {
     files: { 'a.md': 'a\n', 'gone/one.md': '1\n', 'gone/two.md': '2\n' },
     remove: ['gone/one.md', 'gone/two.md'],
   });
-  writeNotice(root, sha, 'Removed the whole directory: `gone/`.');
+  writeNotice(root, sha, table(['| `gone/` | the whole directory |']));
   const result = run(root);
   assert.equal(result.status, 0, result.stdout + result.stderr);
 });
@@ -153,15 +160,11 @@ test('a directory row with its trailing slash covers files beneath it', () => {
 test('a directory row without its trailing slash covers nothing', () => {
   // Loosening this to a substring match is the over-report failure: a row
   // naming `gone/sub` would silently absolve every deletion beneath it.
-  //
-  // The row has to be a NESTED path. A bare `gone` never reaches the coverage
-  // test at all — `recordedPaths` drops tokens with no slash and no file
-  // extension, because the section's prose is full of backticked field names.
   const { root, sha } = makeRepo({
     files: { 'a.md': 'a\n', 'gone/sub/one.md': '1\n' },
     remove: ['gone/sub/one.md'],
   });
-  writeNotice(root, sha, 'Removed: `gone/sub`.');
+  writeNotice(root, sha, table(['| `gone/sub` | written without its trailing slash |']));
   const result = run(root);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /gone\/sub\/one\.md was deleted/);
@@ -170,7 +173,7 @@ test('a directory row without its trailing slash covers nothing', () => {
 test('only the Removed section counts, not the rest of NOTICE.md', () => {
   // `never/removed.md` is named in the § Statuses section by the fixture.
   const { root, sha } = makeRepo({ files: { 'a.md': 'a\n', 'never/removed.md': 'x\n' }, remove: ['never/removed.md'] });
-  writeNotice(root, sha, 'Removed: `unrelated/path.md`.');
+  writeNotice(root, sha, table(['| `unrelated/path.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 1, 'a path recorded in another section must not count');
   assert.match(result.stdout, /never\/removed\.md was deleted/);
@@ -178,7 +181,7 @@ test('only the Removed section counts, not the rest of NOTICE.md', () => {
 
 test('reports how many deletions and records it compared', () => {
   const { root, sha } = makeRepo({ files: { 'a.md': 'a\n', 'docs/gone.md': 'x\n' }, remove: ['docs/gone.md'] });
-  writeNotice(root, sha, 'Removed: `docs/gone.md`.');
+  writeNotice(root, sha, table(['| `docs/gone.md` | a guide |']));
   const result = run(root);
   assert.match(result.stdout, /1 file\(s\) deleted since the base/);
 });
@@ -223,7 +226,7 @@ test('fails rather than passing vacuously when the section records no paths', ()
 test('fails with a usable message when the base commit is unreachable', () => {
   // What a shallow clone looks like from inside the check.
   const { root } = makeRepo({ files: { 'a.md': 'a\n' } });
-  writeNotice(root, 'a'.repeat(40), 'Removed: `x/y.md`.');
+  writeNotice(root, 'a'.repeat(40), table(['| `x/y.md` | a guide |']));
   const result = run(root);
   assert.equal(result.status, 1);
   assert.match(result.stdout, /cannot diff against the base SHA/);
@@ -242,14 +245,22 @@ test('removedSection returns null when the heading is absent', () => {
   assert.equal(removedSection('# NOTICE\n\n## Base\n'), null);
 });
 
-test('recordedPaths takes backticked paths and ignores surrounding prose', () => {
-  const found = recordedPaths('Removed `docs/a.md` and `evals/` because reasons about docs and evals.');
-  assert.deepEqual(found, ['docs/a.md', 'evals/']);
+test('recordedPaths takes the table first column and ignores surrounding prose', () => {
+  const section = [
+    'Removed at import, for reasons about docs and evals:',
+    '',
+    table(['| `docs/a.md` | a guide |', '| `evals/` | the whole directory |']),
+    '',
+    'None of `docs/`, `evals/x.json` or `--strict` below is a record.',
+  ].join('\n');
+  assert.deepEqual(recordedPaths(section), ['docs/a.md', 'evals/']);
 });
 
-test('recordedPaths ignores backticked tokens that are not paths', () => {
-  const found = recordedPaths('The `--strict` flag and `name` field, plus `docs/a.md`.');
-  assert.deepEqual(found, ['docs/a.md']);
+test('recordedPaths ignores the table header and delimiter rows', () => {
+  // Neither carries backticks, which is why neither needs a special case — and
+  // this is what goes red if that ever stops being true.
+  assert.deepEqual(recordedPaths(table([])), []);
+  assert.deepEqual(recordedPaths(table(['| `docs/a.md` | a guide |'])), ['docs/a.md']);
 });
 
 test('isCovered matches an exact path and a trailing-slash prefix only', () => {
@@ -263,6 +274,99 @@ test('isCovered matches an exact path and a trailing-slash prefix only', () => {
 test('baseSha reads the row and rejects a malformed one', () => {
   assert.equal(baseSha('| Base SHA | `' + 'c'.repeat(40) + '` |'), 'c'.repeat(40));
   assert.equal(baseSha('| Base SHA | `deadbeef` |'), null);
+});
+
+// ── the record is the table, not the section ───────────────────────────────
+
+/** The § Removed at import table, which is the only thing that records. */
+function table(rows) {
+  return ['| Removed | Was |', '|---|---|', ...rows].join('\n');
+}
+
+test('a directory named only in the section prose records nothing', () => {
+  // Measured on the real NOTICE.md: `skills/` was harvested out of the phrase
+  // "opencode symlink into `skills/`" and became a blanket over every skill in
+  // the fork. Prose explains a removal; it does not record one.
+  const { root, sha } = makeRepo({
+    files: { 'a.md': 'a\n', 'skills/kept/SKILL.md': 'x\n' },
+    remove: ['skills/kept/SKILL.md'],
+  });
+  writeNotice(root, sha, [
+    table(['| `docs/gone.md` | an install guide |']),
+    '',
+    'The opencode symlink pointed into `skills/`, which is not a removal record.',
+  ].join('\n'));
+  const result = run(root);
+  assert.equal(result.status, 1, 'prose naming a directory must not absolve its subtree');
+  assert.match(result.stdout, /skills\/kept\/SKILL\.md was deleted/);
+});
+
+test('a directory named in the table description column records nothing', () => {
+  // The second measured case: `scripts/` came from "Its `scripts/` directory
+  // was empty afterwards". The second column describes; the first records.
+  const { root, sha } = makeRepo({
+    files: { 'a.md': 'a\n', 'scripts/validator.js': 'x\n' },
+    remove: ['scripts/validator.js'],
+  });
+  writeNotice(root, sha, table(['| `docs/gone.md` | the guide that lived beside `scripts/` |']));
+  const result = run(root);
+  assert.equal(result.status, 1, 'the description column must not record a removal');
+  assert.match(result.stdout, /scripts\/validator\.js was deleted/);
+});
+
+test('the real NOTICE.md does not absolve this fork\'s own files', () => {
+  // The defect in one assertion. With the section's prose harvested, `skills/`
+  // and `scripts/` were blanket rows and every validator in the repository
+  // could be deleted with this gate still green — including the linter that
+  // § Surviving references singles out as deliberately unmodified.
+  const real = fs.readFileSync(path.join(ROOT, 'NOTICE.md'), 'utf8');
+  const recorded = recordedPaths(removedSection(real));
+  for (const survivor of [
+    'scripts/lib/skill-lint.js',
+    'scripts/validate-skills.js',
+    'scripts/check-deletions.js',
+    'scripts/check-ci-coverage.js',
+    'skills/test-driven-development/SKILL.md',
+    'skills/flowly-catalog/SKILL.md',
+  ]) {
+    assert.equal(isCovered(survivor, recorded), false, `${survivor} must not be absolved`);
+  }
+});
+
+test('the real NOTICE.md still records every path it is supposed to', () => {
+  // The other direction, so the fix above cannot be "record nothing". These
+  // are real deletions and each one must stay covered.
+  const real = fs.readFileSync(path.join(ROOT, 'NOTICE.md'), 'utf8');
+  const recorded = recordedPaths(removedSection(real));
+  for (const gone of [
+    'commands/build.toml',
+    '.gemini/commands/spec.toml',
+    '.claude/commands/webperf.md',
+    'docs/comparison.md',
+    'plugin.json',
+    'skills/using-agent-skills/SKILL.md',
+    'evals/cases/using-agent-skills.json',
+    'evals/fixtures/using-agent-skills/incident.md',
+    'skills/idea-refine/scripts/idea-refine.sh',
+  ]) {
+    assert.equal(isCovered(gone, recorded), true, `${gone} must stay recorded`);
+  }
+});
+
+test('recordedPaths counts only what the table records', () => {
+  // The count is printed as a result, so it has to mean something. A shell
+  // assignment in the prose (`IDEAS_DIR="docs/ideas"`) was being counted.
+  const section = [
+    table(['| `skills/x/scripts/run.sh` | a helper |']),
+    '',
+    'Its entire body was `IDEAS_DIR="docs/ideas"` and a `mkdir -p`.',
+  ].join('\n');
+  assert.deepEqual(recordedPaths(section), ['skills/x/scripts/run.sh']);
+});
+
+test('recordedPaths reads every path in a multi-path table cell', () => {
+  const section = table(['| `scripts/a.js`, `scripts/a-test.js` | a pair |']);
+  assert.deepEqual(recordedPaths(section), ['scripts/a.js', 'scripts/a-test.js']);
 });
 
 test('baseSha agrees with the register check on the real NOTICE.md', () => {

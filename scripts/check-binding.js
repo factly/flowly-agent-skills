@@ -179,6 +179,12 @@ const ALLOWED_MENTIONS = [
     reason:
       'the deletion record quoting the deleted script\'s body — the quotation is the evidence that the script had no job left, which is the whole reason it went',
   },
+  {
+    file: 'NOTICE.md',
+    line: "| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own six at `commands/` — see below |",
+    reason:
+      'the same deletion, now as a table row rather than prose. check-deletions.js reads the § Removed at import table\'s FIRST COLUMN only — reading the whole section as prose let a descriptive mention of `skills/` absolve every inherited skill — so the eight files under this path have no other spelling that records them',
+  },
 ];
 
 /**

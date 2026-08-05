@@ -33,8 +33,14 @@ Merges are resolved by eye against the ownership register below. On the day of t
 
 ## Removed at import
 
-These are the doors this fork does not ship. They were deleted in the import commit rather than left
-to rot, because each one is a manifest or a command set that would have to be kept in sync by hand:
+Every path this fork deleted is in the table below, and the table is the record: `scripts/check-deletions.js`
+reads its **first column** and fails on any deletion missing from it. The prose after the table explains
+the entries that need explaining — it does not record them, because prose about a removal names paths
+that were *not* removed, and reading those as records absolved whole subtrees.
+
+The first nine rows are the doors this fork does not ship, deleted in the import commit rather than
+left to rot, because each one is a manifest or a command set that would have to be kept in sync by
+hand. The rest went later, as this fork's own replacements were authored.
 
 | Removed | Was |
 |---|---|
@@ -47,6 +53,12 @@ to rot, because each one is a manifest or a command set that would have to be ke
 | `docs/codex-setup.md` | The Codex install guide — see the paragraph below, where the manifest is kept and the guide is not |
 | `docs/comparison.md` | Upstream's honest map of how it differs from two other skills collections. It compares *upstream* to them, and this fork is a third thing again; keeping it would have meant maintaining a comparison of a project we are not |
 | `.github/workflows/test-plugin-install.yml` | Upstream's standalone install smoke test. Superseded, not dropped: the `install` job in `.github/workflows/ci.yml` does the same thing and is one of the jobs `gates` requires, so the coverage moved rather than went. It left later than the rest, when CI was wired |
+| `plugin.json` | Antigravity's plugin manifest at the repository root — the counterpart to the marketplace manifest above, and removed with it |
+| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own six at `commands/` — see below |
+| `skills/using-agent-skills/SKILL.md` | Upstream's meta-skill, replaced by `skills/flowly-catalog/SKILL.md` — see below |
+| `evals/cases/using-agent-skills.json` | The meta-skill's eval case. Rename detection pairs it with its replacement, so it is a deletion only `--no-renames` can see — see below |
+| `evals/fixtures/using-agent-skills/incident.md` | The meta-skill's eval fixture, paired with its replacement the same way |
+| `skills/idea-refine/scripts/idea-refine.sh` | Created the ideas directory that skill wrote its one-pager into. Under the binding a refined idea becomes a Flowly issue instead — see below |
 
 `.codex-plugin/plugin.json` is **kept**. The Codex door is not shipped and not tested, but it is held
 openable by two authoring rules that cost nothing: no substitution token in any command body, and
@@ -103,7 +115,8 @@ that skill saved its one-pager into. Under the binding a refined idea becomes a 
 directory never exists and the script has no job left to do. It is recorded here rather than merely
 dropped from the register, because "an inherited file is gone" is the one change a merge cannot tell
 apart from "an inherited file was never here" — upstream will offer it back on the next sync, and the
-answer is no. Its `scripts/` directory was empty afterwards and went with it.
+answer is no. Its own `skills/idea-refine/scripts/` directory was empty afterwards and went with it;
+git tracks no directories, so the file above is the whole record.
 
 ## Surviving references to upstream
 
