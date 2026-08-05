@@ -1,0 +1,548 @@
+schema_version: "1.1"
+name: flowly-round-trip
+description: >-
+  The end-to-end case for this distribution's one product claim: an agent
+  holding this corpus drives Flowly, where an agent without it writes a local
+  file. It runs the plan phase against a live Flowly instance and grades both
+  halves — the planning artifacts reach the issue, and nothing planning-shaped
+  reaches the working tree.
+
+  Read by `claude plugin eval`, which is in early access and cannot be executed
+  here or in CI. See the Tier-3 section of evals/README.md before running it: it
+  needs a live instance, it spends tokens, and every run leaves an issue behind
+  that Flowly has no tool to delete.
+
+tags:
+  - flowly
+  - round-trip
+  - tier-3
+  - live-instance
+
+# `runs: 1`, deliberately, against a default of 3.
+#
+# Every run creates an issue on a live instance and Flowly has no delete tool
+# for one, so `runs: 3` under `--ablation with-without` would leave six
+# permanent issues per invocation. Raise it only when you mean to pay that, and
+# say so to whoever owns the instance.
+runs: 1
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Arrange
+#
+# Runs only under `--scaffold`, as you, with your environment. It needs:
+#
+#   FLOWLY_MCP_URL          the MCP endpoint, e.g. http://localhost:8000/mcp/
+#                           or https://flowly.example.com/mcp/
+#   FLOWLY_MCP_TOKEN        the bearer token
+#   FLOWLY_EVAL_PROJECT_ID  optional; defaults to the first project the
+#                           instance lists
+#
+# Nothing here is committed: the endpoint and the token come from your
+# environment, and the `.mcp.json` this writes lives in the run's sandbox.
+#
+# It is self-contained on purpose. The scaffold runs in the sandbox working
+# directory, not in the repository, so it cannot reliably resolve a path back
+# into `evals/fixtures/` — and a case that guessed at one would either fail or,
+# worse, let a drifting agent write a planning file into this repository. The
+# project and the seed research doc are therefore written here, inline.
+# ─────────────────────────────────────────────────────────────────────────────
+context:
+  scaffold_script: |
+    set -euo pipefail
+
+    : "${FLOWLY_MCP_URL:?set FLOWLY_MCP_URL — this case needs a live Flowly instance}"
+    : "${FLOWLY_MCP_TOKEN:?set FLOWLY_MCP_TOKEN — this case needs a live Flowly instance}"
+
+    # ── the project the plan is about ──────────────────────────────────────
+    # Small, and shaped so that drifting is easy: it already has a docs/
+    # directory, which is the most natural place for an agent to drop a plan.
+    # If writing one to disk were impossible here, the second half of this case
+    # could never fail and would be measuring nothing.
+
+    mkdir -p src tests docs
+
+    cat > README.md <<'EOF'
+    # tollgate
+
+    An HTTP service that fronts a partner API. Callers authenticate with a
+    per-tenant token; tollgate forwards the request upstream unchanged.
+
+    There is no rate limiting anywhere in the request path. One tenant looping a
+    script has twice exhausted the upstream quota for every other tenant, and the
+    only signal was the upstream returning 429 to traffic that had nothing to do
+    with the offender.
+
+    Run the tests with `python -m unittest discover tests`.
+    EOF
+
+    cat > docs/architecture.md <<'EOF'
+    # Architecture
+
+    Request path: `client -> authenticate() -> forward() -> upstream -> response`.
+
+    ## What is deliberately absent
+
+    - **No rate limiting.** Nothing counts requests, per tenant or in total.
+    - **No request log.** Failures surface as upstream 429s that name the
+      service rather than the tenant that caused them.
+    - **No persistence.** Tenant tokens live in a process-local dict.
+
+    ## Constraints
+
+    - Several processes behind a load balancer, so a counter in one process sees
+      a fraction of a tenant's traffic.
+    - Upstream quota resets on a fixed wall-clock minute, not a rolling window.
+    - 50 ms latency budget for the whole hop.
+    EOF
+
+    cat > src/tokens.py <<'EOF'
+    """Tenant token lookup, backed by a process-local dict."""
+
+    _TOKENS = {
+        "tok_acme": "tenant_acme",
+        "tok_globex": "tenant_globex",
+    }
+
+
+    def resolve_tenant(token):
+        return _TOKENS.get(token)
+    EOF
+
+    cat > src/gateway.py <<'EOF'
+    """The request path: authenticate, forward, return.
+
+    There is no rate limiting here. Every accepted request goes upstream.
+    """
+
+    from tokens import resolve_tenant
+
+
+    class Unauthorized(Exception):
+        pass
+
+
+    def authenticate(headers):
+        raw = headers.get("Authorization", "")
+        if not raw.startswith("Bearer "):
+            raise Unauthorized("missing bearer token")
+        tenant = resolve_tenant(raw[len("Bearer "):])
+        if tenant is None:
+            raise Unauthorized("unknown token")
+        return tenant
+
+
+    def forward(tenant, request, upstream):
+        return upstream.send(
+            method=request.method, path=request.path, body=request.body,
+        )
+
+
+    def handle(request, upstream):
+        return forward(authenticate(request.headers), request, upstream)
+    EOF
+
+    cat > tests/test_gateway.py <<'EOF'
+    import sys
+    import unittest
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+    from gateway import Unauthorized, authenticate, handle  # noqa: E402
+
+
+    class FakeRequest:
+        headers = {"Authorization": "Bearer tok_acme"}
+        method = "GET"
+        path = "/v1/things"
+        body = b""
+
+
+    class FakeUpstream:
+        calls = 0
+
+        def send(self, **kwargs):
+            self.calls += 1
+            return 200, b"ok"
+
+
+    class GatewayTest(unittest.TestCase):
+        def test_unknown_token_is_rejected(self):
+            with self.assertRaises(Unauthorized):
+                authenticate({"Authorization": "Bearer nope"})
+
+        def test_every_accepted_request_reaches_upstream(self):
+            upstream = FakeUpstream()
+            for _ in range(100):
+                handle(FakeRequest(), upstream)
+            # No limiter exists, so all one hundred are forwarded.
+            self.assertEqual(upstream.calls, 100)
+    EOF
+
+    # ── the door ───────────────────────────────────────────────────────────
+    # Written into the sandbox rather than carried by the plugin, so that BOTH
+    # arms can reach Flowly. If the door came from the plugin, the ablation
+    # would compare "can call Flowly" against "cannot", which is a claim about
+    # configuration. Handing both arms the same door makes the ablation vary
+    # exactly one thing: the corpus.
+    cat > .mcp.json <<EOF
+    {
+      "mcpServers": {
+        "flowly": {
+          "type": "http",
+          "url": "${FLOWLY_MCP_URL}",
+          "headers": { "Authorization": "Bearer ${FLOWLY_MCP_TOKEN}" }
+        }
+      }
+    }
+    EOF
+
+    # ── the issue, and its research precondition ───────────────────────────
+    # The plan command reads `research` as its input. A run that produces three
+    # docs because research was never written is a red case for a reason that
+    # has nothing to do with the claim, so the seed is asserted, not assumed:
+    # this aborts unless the issue holds exactly one doc kind afterwards.
+
+    seed_dir="$(mktemp -d)"
+    cat > "$seed_dir/research.md" <<'EOF'
+    ---
+    doc: research
+    title: Per-tenant rate limiting for tollgate
+    ---
+
+    # Research — per-tenant rate limiting for tollgate
+
+    Written by the round-trip eval scaffold, not by an agent.
+
+    ## The problem
+
+    tollgate forwards every authenticated request upstream. Nothing counts
+    requests, so one tenant looping a script exhausts the shared upstream quota
+    and every other tenant starts seeing 429s that name the service rather than
+    the offender.
+
+    ## What the code does today
+
+    - `src/gateway.py` — `handle()` is `authenticate()` then `forward()`. There
+      is no seam between them where a limiter could sit without being invented.
+    - `src/tokens.py` — tenant lookup is a process-local dict. The service has
+      no shared store of any kind.
+    - `tests/test_gateway.py` — one test forwards a hundred requests and asserts
+      all hundred reach upstream. It encodes the current absence, so it is the
+      test a limiter changes first.
+
+    ## Constraints that bound the design
+
+    - Several processes behind a load balancer: an in-process counter
+      under-counts by roughly the process count.
+    - The upstream quota resets on a fixed wall-clock minute, so a rolling
+      window locally would not match what actually breaks.
+    - 50 ms for the whole hop rules out a synchronous hop to a store that is not
+      already in the path.
+
+    ## Open questions
+
+    1. Where the counter lives, given that no shared store exists yet.
+    2. What happens when it is unreachable — fail open and lose the protection,
+       or fail closed and turn a limiter outage into an outage.
+    3. Whether the limit is per tenant, per tenant per route, or both.
+    4. How a rejected caller learns when to retry.
+
+    ## Prior art in the tree
+
+    None. No limiter, no request log, no shared store, so there is no existing
+    convention to follow.
+    EOF
+
+    SEED_FILE="$seed_dir/research.md" python3 - <<'PY'
+    import json
+    import os
+    import sys
+    import urllib.request
+
+    URL = os.environ["FLOWLY_MCP_URL"]
+    TOKEN = os.environ["FLOWLY_MCP_TOKEN"]
+
+
+    def call(tool, args):
+        body = json.dumps({
+            "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": tool, "arguments": args},
+        }).encode()
+        req = urllib.request.Request(URL, data=body, headers={
+            "Authorization": "Bearer " + TOKEN,
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        })
+        with urllib.request.urlopen(req) as response:
+            raw = response.read().decode()
+        # A call answers in SSE frames; the last `data:` line carries the
+        # payload. A refusal comes back with isError and PLAIN TEXT content, so
+        # parsing it as JSON throws and hides the message that explains it.
+        frames = [line[6:] for line in raw.splitlines() if line.startswith("data: ")]
+        payload = json.loads(frames[-1] if frames else raw)
+        if "error" in payload:
+            sys.exit("MCP transport error on %s: %s" % (tool, payload["error"]))
+        result = payload.get("result", {})
+        texts = [c.get("text", "") for c in result.get("content", []) if c.get("type") == "text"]
+        if result.get("isError"):
+            sys.exit("%s refused: %s" % (tool, " | ".join(texts)))
+        out = []
+        for text in texts:
+            try:
+                out.append(json.loads(text))
+            except ValueError:
+                out.append(text)
+        return out
+
+
+    project_id = os.environ.get("FLOWLY_EVAL_PROJECT_ID")
+    if not project_id:
+        projects = call("list_projects", {})
+        if not projects:
+            sys.exit("the instance has no projects — set FLOWLY_EVAL_PROJECT_ID")
+        project_id = projects[0]["id"]
+        sys.stderr.write("scaffold: project not pinned, using %r\n" % projects[0].get("name"))
+
+    issue = call("create_issue", {
+        "project_id": project_id,
+        "title": "[eval] round-trip - per-tenant rate limiting for tollgate",
+        "description": (
+            "Created by evals/flowly-round-trip. This is an eval fixture, not real work.\n\n"
+            "Flowly has no delete tool for an issue, so it stays. Cancel it if it is in the way."
+        ),
+        "status": "todo",
+        "priority": 3,
+    })[0]
+    identifier = issue["identifier"]
+
+    call("put_planning_doc", {
+        "identifier": identifier,
+        "kind": "research",
+        "content": open(os.environ["SEED_FILE"], encoding="utf-8").read(),
+    })
+
+    kinds = sorted(doc["kind"] for doc in call("list_planning_docs", {"identifier": identifier}))
+    if kinds != ["research"]:
+        sys.exit(
+            "precondition failed: %s holds %s, expected exactly ['research']. "
+            "Aborting rather than measuring the wrong thing." % (identifier, kinds)
+        )
+
+    with open("flowly-issue.txt", "w", encoding="utf-8") as handle:
+        handle.write(identifier + "\n")
+    print("scaffold: created %s and seeded its research doc" % identifier)
+    PY
+
+    rm -rf "$seed_dir"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Act
+# ─────────────────────────────────────────────────────────────────────────────
+execution:
+  # The identifier is created by the scaffold, so it cannot be a literal here.
+  # Naming the file is the smallest deviation available: everything after the
+  # command name is what Claude Code appends to the command body as its
+  # argument text, which is exactly where a human types `FLO-1234`.
+  prompt: |
+    /flowly:plan the issue identifier for this run is the only line of flowly-issue.txt in the current directory — read that file and treat its contents as this command's argument
+
+  # The ceremony is long: read the issue, read what exists, invoke two skills,
+  # write three artifacts, read back, submit. The defaults of 10 turns and 300
+  # seconds cut it off partway, and a cut-off run scores zero for reasons that
+  # look like drift.
+  max_turns: 60
+  timeout_seconds: 900
+
+  # Write, Edit and Bash are here ON PURPOSE, and removing them would quietly
+  # void this case. An agent that cannot write a file cannot write a local plan,
+  # so every `exists: false` grader below would pass no matter what the corpus
+  # said. The absence has to be reachable or it is not being tested.
+  #
+  # They still need an operator grant at the command line:
+  #   claude plugin eval . --scaffold --ablation with-without \
+  #     --allow-tools Write Edit Bash 'mcp__flowly__*'
+  allowed_tools:
+    - Read
+    - Glob
+    - Grep
+    - Write
+    - Edit
+    - Bash
+    - Skill
+    - mcp__flowly
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Assert
+#
+# Tool names are `mcp__<server>__<tool>`, and the server is named `flowly` by
+# the .mcp.json the scaffold writes. Renaming it there renames every grader
+# here.
+# ─────────────────────────────────────────────────────────────────────────────
+graders:
+  # ── the harness is testing what it says it is ──────────────────────────────
+  # A quotation from commands/plan.md, held here as a deliberate second copy.
+  # It does two jobs. It proves the slash command expanded at all, so a runner
+  # that passed the prompt through as literal text is reported as that rather
+  # than as model drift. And it is what makes the Verify clause true: delete the
+  # refusal from the command and this grader can no longer pass, because the
+  # sentence it looks for is no longer in the body the agent receives.
+  #
+  # `with-only`: without the plugin there is no command body to quote, so
+  # scoring it in the baseline arm would add a guaranteed failure that tells you
+  # nothing and muddies the delta.
+  #
+  # The quotation stops where the command's hard wrap does. The trace carries
+  # the body verbatim, newlines and all, so a clause spanning two source lines
+  # can never match as a literal pattern — the first draft of this grader quoted
+  # the tail of the sentence and would have failed every run for that reason
+  # alone. check-commands.js holds the whole block byte-identical across all six
+  # commands, so the wrap this quotation stops at cannot silently move.
+  - name: plan-command-body-reached-the-agent
+    type: regex
+    target: trace
+    pattern: do not fall back to writing a plan, a spec, a todo list, a checklist or notes
+    match: contains
+    arm: with-only
+
+  # ── half one: the artifacts reached the issue ──────────────────────────────
+  # The arithmetic, because a wrong number here is the likeliest way this case
+  # is quietly incorrect. The plan phase produces three of the four kinds and
+  # reads the fourth:
+  #
+  #   research  seeded by the scaffold — the command's INPUT, never its output
+  #   plan      put_planning_doc
+  #   risks     put_planning_doc
+  #   todo      put_todo_tasks  ← a different tool, because the todo doc is
+  #                               submitted structurally
+  #
+  # So `put_planning_doc` is called twice, not four times. `min: 4` here would
+  # fail a correct run. No `max`: revising a doc before submitting is fine.
+  - name: reads-the-issue-first
+    type: tool_used
+    tool: mcp__flowly__get_issue
+    min: 1
+    arm: both
+
+  - name: writes-the-plan-and-risks-docs
+    type: tool_used
+    tool: mcp__flowly__put_planning_doc
+    min: 2
+    arm: both
+
+  - name: writes-the-todo-doc-structurally
+    type: tool_used
+    tool: mcp__flowly__put_todo_tasks
+    min: 1
+    arm: both
+
+  # The command does not merely write, it reads back: "Confirm that with
+  # list_planning_docs rather than assuming your writes landed."
+  - name: reads-the-docs-back
+    type: tool_used
+    tool: mcp__flowly__list_planning_docs
+    min: 1
+    arm: both
+
+  - name: submits-to-the-plan-gate
+    type: tool_used
+    tool: mcp__flowly__submit_for_review
+    min: 1
+    arm: both
+
+  - name: writes-before-submitting
+    type: tool_order
+    before: mcp__flowly__put_planning_doc
+    after: mcp__flowly__submit_for_review
+    arm: both
+
+  # The acceptance says four planning docs EXIST, which is a statement about the
+  # issue rather than about the calls. The tool graders above prove the writes
+  # were made; this one reads the answer the instance gave back.
+  - name: four-planning-doc-kinds-exist-on-the-issue
+    type: llm
+    focus: trace
+    criteria: >-
+      The trace contains a list_planning_docs call made AFTER the planning docs
+      were written, and its result reports all four kinds — research, plan, todo
+      and risks — on the issue. Judge the tool result, not the assistant's prose
+      about it: a claim that four docs exist, with no tool result showing them,
+      does not satisfy this. If the read-back happened before the last write, or
+      reports fewer than four kinds, this fails.
+    arm: both
+
+  # ── half two: nothing planning-shaped reached the working tree ─────────────
+  #
+  # `file_exists` and `target: files` both read the list of files CREATED during
+  # the run, so a file the scaffold wrote grades as absent and only the agent's
+  # own output is under test.
+  #
+  # WHY THIS SHAPE. The weak version of this assertion is a whitelist of
+  # filenames, and it fails by construction: it can only refuse the destinations
+  # someone already thought of, and the destination a drifting agent invents is
+  # by definition not on the list. So the load-bearing grader is the regex net
+  # below — the whole planning vocabulary, case-insensitive, anywhere in a
+  # created path, at any depth, under any extension. A directory (`plan/…`) is
+  # caught by the same net as a file, because the word is matched in the path
+  # rather than in the basename.
+  #
+  # The globs after it are named sensors, not the claim. They exist so that a
+  # failure reads as "it wrote a spec" rather than "the net matched something",
+  # and because they are the same destinations check-binding.js forbids
+  # statically — the same rule then holds in prose and in behaviour.
+  #
+  # Scoped to the planning vocabulary rather than to "any created file at all"
+  # on purpose: an agent that runs the fixture's tests leaves bytecode caches
+  # behind, and failing the product claim on `__pycache__` would be a red case
+  # that teaches nobody anything.
+  #
+  # `arm: both` on every one of these. They are the delta: they should pass with
+  # the plugin and fail without it, and a grader scoped to one arm cannot show
+  # that.
+  - name: no-planning-artifact-written-to-disk
+    type: regex
+    target: files
+    pattern: (plan|spec|todo|task|risk|note|checklist|design|proposal|breakdown|scratch|draft)
+    flags: i
+    match: not_contains
+    arm: both
+
+  - name: no-plan-file
+    type: file_exists
+    path: "**/*plan*"
+    exists: false
+    arm: both
+
+  - name: no-spec-file
+    type: file_exists
+    path: "**/*spec*"
+    exists: false
+    arm: both
+
+  - name: no-todo-file
+    type: file_exists
+    path: "**/*todo*"
+    exists: false
+    arm: both
+
+  - name: no-task-file
+    type: file_exists
+    path: "**/*task*"
+    exists: false
+    arm: both
+
+  - name: no-notes-file
+    type: file_exists
+    path: "**/*note*"
+    exists: false
+    arm: both
+
+expected_outcome: >-
+  With the plugin: the agent resolves the issue, reads its research doc, writes
+  plan and risks with put_planning_doc and the todo doc with put_todo_tasks,
+  reads all four kinds back, submits to the plan gate, and leaves the working
+  tree without a single planning artifact in it.
+
+  Without the plugin: /flowly:plan is not a command, the binding refusal never
+  reaches the model, and the planning artifacts land on disk. The headline
+  number is the delta between the two arms — that delta is the product claim.
