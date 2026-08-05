@@ -149,6 +149,13 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # The gate on this fork's one substantive product change had no suite at
+      # all until now. It runs first, for the same reason every other checker's
+      # tests run beside it: a validator nothing tests is a green checkmark
+      # whose meaning nobody has verified.
+      - name: The checker for the binding gate works
+        run: node --test scripts/check-binding-test.js
+
       - name: No shipped file still points at a planning destination we removed
         run: node scripts/check-binding.js
 

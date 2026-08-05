@@ -116,29 +116,35 @@ function baseSha(notice) {
   return m ? m[1] : null;
 }
 
+/** The exit footer, in one place: five preconditions and the result share it. */
+function finish(errors) {
+  console.log(`\n${errors} error(s) — ${errors ? 'FAILED' : 'PASSED'}`);
+  return errors ? 1 : 0;
+}
+
+/** A precondition that could not be met: report it, then exit as one error. */
+function fail(...lines) {
+  for (const line of lines) console.log(line);
+  return finish(1);
+}
+
 function main(argv = process.argv.slice(2)) {
   const root = parseRoot(argv);
   const noticePath = path.join(root, NOTICE_FILE);
 
   if (!fs.existsSync(noticePath)) {
-    console.log(`✗  ${NOTICE_FILE} not found`);
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(`✗  ${NOTICE_FILE} not found`);
   }
 
   const notice = fs.readFileSync(noticePath, 'utf8');
   const sha = baseSha(notice);
   if (!sha) {
-    console.log(`✗  no \`Base SHA\` row in ${NOTICE_FILE} — deletions cannot be enumerated`);
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(`✗  no \`Base SHA\` row in ${NOTICE_FILE} — deletions cannot be enumerated`);
   }
 
   const section = removedSection(notice);
   if (section === null) {
-    console.log(`✗  ${NOTICE_FILE} has no \`${REMOVED_HEADING}\` section`);
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(`✗  ${NOTICE_FILE} has no \`${REMOVED_HEADING}\` section`);
   }
 
   let deleted;
@@ -150,17 +156,15 @@ function main(argv = process.argv.slice(2)) {
       .map((l) => l.trim())
       .filter(Boolean);
   } catch (err) {
-    console.log(`✗  cannot diff against the base SHA ${sha} — ${err.message.split('\n')[0]}`);
-    console.log('   (a shallow clone has no base commit; fetch with fetch-depth: 0)');
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(
+      `✗  cannot diff against the base SHA ${sha} — ${err.message.split('\n')[0]}`,
+      '   (a shallow clone has no base commit; fetch with fetch-depth: 0)',
+    );
   }
 
   const recorded = recordedPaths(section);
   if (recorded.length === 0) {
-    console.log(`✗  \`${REMOVED_HEADING}\` records no paths — nothing could fail this check`);
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(`✗  \`${REMOVED_HEADING}\` records no paths — nothing could fail this check`);
   }
 
   const missing = deleted.filter((f) => !isCovered(f, recorded));
@@ -178,13 +182,11 @@ function main(argv = process.argv.slice(2)) {
   // replacement (`skills/flowly-catalog/SKILL.md`) — a distinction the prose
   // does not draw, and inventing one here would trade a real check for four
   // false positives.
-  const errors = missing.length;
-  if (errors === 0) {
+  if (missing.length === 0) {
     console.log(`✓  every deletion is recorded — ${deleted.length} file(s) deleted since the base, ${recorded.length} path(s) recorded`);
   }
 
-  console.log(`\n${errors} error(s) — ${errors ? 'FAILED' : 'PASSED'}`);
-  return errors ? 1 : 0;
+  return finish(missing.length);
 }
 
 module.exports = { main, removedSection, recordedPaths, isCovered, baseSha };

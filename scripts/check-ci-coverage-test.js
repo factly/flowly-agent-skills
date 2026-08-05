@@ -158,6 +158,18 @@ test('does not descend into scripts/lib, whose modules CI never invokes directly
   assert.doesNotMatch(result.stdout, /helper\.js/);
 });
 
+test('a directory whose name ends in .js is not an executable', () => {
+  // This is what the isFile() guard actually defends, and nothing reached it.
+  // `scripts/lib/` is kept out by the extension filter alone — "lib" ends in
+  // neither .js nor .sh — so deleting the guard left all 34 tests green while
+  // changing behaviour for any directory that IS named like a script.
+  const root = makeSandbox();
+  fs.mkdirSync(path.join(root, 'scripts', 'bundle.js'));
+  const result = run(root, 4);
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+  assert.doesNotMatch(result.stdout, /bundle\.js/, 'a directory is not a gate CI can run');
+});
+
 test('counts every executable it checked, so a broken walk is visible', () => {
   const result = run(makeSandbox(), 4);
   // 3 scripts + 1 hook test. If the walk silently stopped early the number

@@ -452,7 +452,11 @@ test('refuses a fence closed with the other fence character', () => {
     [`${FENCE}bash`, 'echo hi', '~~~', `And the instance is at ${INSTANCE}.`, ''].join('\n'),
     'a mismatched closer leaves the fence open',
   );
-  assert.match(out, /unclosed fence/);
+  // Pinned to the FINDING line, not the word. A bare /unclosed fence/ is
+  // satisfied by the remedy paragraph the checker prints after ANY violation —
+  // so it stayed green when the closer's character check was deleted, which is
+  // the one mutation this test exists to catch.
+  assert.match(out, reportedAs(`${FENCE}bash`, 'unclosed fence'));
 });
 
 test('refuses an unclosed fence, which silently masks the rest of the file', () => {
@@ -465,7 +469,7 @@ test('refuses an unclosed fence, which silently masks the rest of the file', () 
     [`${FENCE}typescript`, 'const a = 1;', ''].join('\n'),
     'a fence that never closes',
   );
-  assert.match(out, /unclosed fence/);
+  assert.match(out, reportedAs(`${FENCE}typescript`, 'unclosed fence'));
 });
 
 test('a properly closed fence is not a violation, in either fence character', () => {
@@ -509,6 +513,21 @@ test('still allows the documentation, loopback and metadata addresses', () => {
     'an all-0/all-255 quad is a mask, not a machine',
   );
   allows('Upgrade to 4.17.21 and pin 1.2.3 in the lockfile.\n', 'a semver is not an address');
+});
+
+test('a host that merely STARTS with an address is not that address', () => {
+  // The address allowlist compares a WHOLE host. `127.0.0.1.<attacker>` only
+  // begins with one, and an unanchored shape test hands it the loopback
+  // allowance — an allowlist bypass wearing a trusted prefix, and the leak it
+  // hides is a real host on somebody else's domain.
+  //
+  // Surfaced by mutation: dropping the `^…$` from the shared IPv4 shape
+  // constant killed no test in this file and no probe in a 40k-line corpus.
+  // Both call sites of that constant depend on the anchoring, so it needs a
+  // reader of its own.
+  refuses(`See ${url(dot(ip4(127, 0, 0, 1), 'evil', 'io'))}/mcp here.\n`, 'loopback-prefixed domain');
+  refuses(`See ${url(dot(ip4(10, 0, 0, 1), 'attacker', 'io'))}/x here.\n`, 'and a private-range twin');
+  allows(`Bind ${ip4(127, 0, 0, 1)} locally.\n`, 'while the address itself stays allowed');
 });
 
 // ── internal-network suffixes: usable, or it gets switched off ────────────

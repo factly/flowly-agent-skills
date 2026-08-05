@@ -278,11 +278,6 @@ test('baseSha reads the row and rejects a malformed one', () => {
 
 // ── the record is the table, not the section ───────────────────────────────
 
-/** The § Removed at import table, which is the only thing that records. */
-function table(rows) {
-  return ['| Removed | Was |', '|---|---|', ...rows].join('\n');
-}
-
 test('a directory named only in the section prose records nothing', () => {
   // Measured on the real NOTICE.md: `skills/` was harvested out of the phrase
   // "opencode symlink into `skills/`" and became a blanket over every skill in

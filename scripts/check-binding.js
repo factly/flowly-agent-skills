@@ -513,11 +513,36 @@ function main() {
   if (errorCount > 0) process.exit(1);
 }
 
+// The rule tables and the four checks, so a test can drive each check against a
+// synthetic file list. The checks already take their corpus as an argument —
+// `files`, `byRoot`, `byRel` — so nothing here needed reshaping to be testable;
+// what was missing was only a way to require this file without running it.
+module.exports = {
+  main,
+  collect,
+  walk,
+  checkScanCoverage,
+  checkForbiddenDestinations,
+  checkRequiredBindings,
+  checkConventionFirst,
+  ALL_ROOTS,
+  SCAN_ROOTS,
+  ROOT_PROSE,
+  ROOT_PROSE_LABEL,
+  FORBIDDEN,
+  ALLOWED_MENTIONS,
+  REQUIRED_BINDINGS,
+  CONVENTION_FIRST,
+  CONVENTION_FIRST_MARKER,
+};
+
 // Surface unexpected failures (fs errors, an unreadable file, …) as a
 // structured one-line CI error instead of an uncaught stack trace.
-try {
-  main();
-} catch (err) {
-  console.error(`\nERROR: check-binding failed unexpectedly: ${err.message}`);
-  process.exit(1);
+if (require.main === module) {
+  try {
+    main();
+  } catch (err) {
+    console.error(`\nERROR: check-binding failed unexpectedly: ${err.message}`);
+    process.exit(1);
+  }
 }

@@ -98,7 +98,7 @@ const AGGREGATE_JOB = 'gates';
 // The number of executables this repository ships. See the header: this is the
 // fixed point that makes a DELETED gate visible. Changing it is a deliberate
 // act and belongs in the same commit as the gate it accounts for.
-const EXPECTED_EXECUTABLES = 23;
+const EXPECTED_EXECUTABLES = 24;
 
 function parseRoot(argv) {
   const i = argv.indexOf('--root');
@@ -211,26 +211,41 @@ function parseWorkflow(text) {
   return { jobs, needs, malformed };
 }
 
+/**
+ * The two directories in scope and what counts as an executable in each. See
+ * the header: `scripts/` ships validators and test suites alike, while only the
+ * hook TEST suites are CI's to run — the hooks themselves are run by the agent
+ * harness at session start.
+ *
+ * Neither walk recurses, which is what keeps `scripts/lib/` out: a library
+ * reached through its caller is already covered by its caller's job.
+ */
+const EXECUTABLE_DIRS = [
+  { dir: 'scripts', counts: (name) => name.endsWith('.js') || name.endsWith('.sh') },
+  { dir: 'hooks', counts: (name) => name.endsWith('-test.sh') },
+];
+
 /** Executables CI is expected to invoke, as repo-relative paths. */
 function shippedExecutables(root) {
   const found = [];
-
-  const scriptsDir = path.join(root, 'scripts');
-  for (const entry of fs.readdirSync(scriptsDir, { withFileTypes: true })) {
-    if (!entry.isFile()) continue; // skips scripts/lib/ — see the header
-    if (entry.name.endsWith('.js') || entry.name.endsWith('.sh')) {
-      found.push(`scripts/${entry.name}`);
+  for (const { dir, counts } of EXECUTABLE_DIRS) {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      if (entry.isFile() && counts(entry.name)) found.push(`${dir}/${entry.name}`);
     }
   }
-
-  const hooksDir = path.join(root, 'hooks');
-  for (const entry of fs.readdirSync(hooksDir, { withFileTypes: true })) {
-    if (entry.isFile() && entry.name.endsWith('-test.sh')) {
-      found.push(`hooks/${entry.name}`);
-    }
-  }
-
   return found.sort();
+}
+
+/** The exit footer, in one place: three preconditions and the result share it. */
+function finish(errors) {
+  console.log(`\n${errors} error(s) — ${errors ? 'FAILED' : 'PASSED'}`);
+  return errors ? 1 : 0;
+}
+
+/** A precondition that could not be met: report it, then exit as one error. */
+function fail(...lines) {
+  for (const line of lines) console.log(line);
+  return finish(1);
 }
 
 function main(argv = process.argv.slice(2)) {
@@ -239,15 +254,11 @@ function main(argv = process.argv.slice(2)) {
   const workflowPath = path.join(root, WORKFLOW_REL);
 
   if (expected === null) {
-    console.log('✗  --expect needs a non-negative integer');
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail('✗  --expect needs a non-negative integer');
   }
 
   if (!fs.existsSync(workflowPath)) {
-    console.log(`✗  ${WORKFLOW_REL} not found — nothing runs any gate`);
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail(`✗  ${WORKFLOW_REL} not found — nothing runs any gate`);
   }
 
   const workflow = fs.readFileSync(workflowPath, 'utf8');
@@ -256,9 +267,7 @@ function main(argv = process.argv.slice(2)) {
   // A repository with no gates would pass every assertion below without making
   // one. Say so instead.
   if (executables.length === 0) {
-    console.log('✗  found no scripts or hook tests to check — the walk is broken');
-    console.log('\n1 error(s) — FAILED');
-    return 1;
+    return fail('✗  found no scripts or hook tests to check — the walk is broken');
   }
 
   let errors = 0;
@@ -326,8 +335,7 @@ function main(argv = process.argv.slice(2)) {
     }
   }
 
-  console.log(`\n${errors} error(s) — ${errors ? 'FAILED' : 'PASSED'}`);
-  return errors ? 1 : 0;
+  return finish(errors);
 }
 
 module.exports = { main, shippedExecutables, parseWorkflow, invocationLines, invokedPaths };

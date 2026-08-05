@@ -117,18 +117,14 @@ const { spawnSync } = require('child_process');
 
 const REPO_ROOT = path.resolve(__dirname, '..');
 
-// `--root <dir>` scans another tree. Every sibling check here has this seam;
-// this one did not, and that is the whole reason it was the largest untested
-// script in the repo — there was no way to point it at a tree containing a
-// deliberate leak. A guard on a one-way door that cannot be exercised is a
-// guard nobody has watched work.
-function parseRoot(argv) {
-  const i = argv.indexOf('--root');
-  return i === -1 ? REPO_ROOT : path.resolve(argv[i + 1]);
-}
-
 /**
  * Flags, and the one judgement call in them.
+ *
+ * `--root <dir>` scans another tree. Every sibling check here has this seam;
+ * this one did not, and that is the whole reason it was the largest untested
+ * script in the repo — there was no way to point it at a tree containing a
+ * deliberate leak. A guard on a one-way door that cannot be exercised is a
+ * guard nobody has watched work.
  *
  * `--require-git` turns a missing work tree from a fallback into a failure.
  * `CI` does the same implicitly, and that is deliberate rather than lazy: a
@@ -145,8 +141,9 @@ function parseRoot(argv) {
  * failure go away, and the failure is the point.
  */
 function parseFlags(argv) {
+  const rootAt = argv.indexOf('--root');
   return {
-    root: parseRoot(argv),
+    root: rootAt === -1 ? REPO_ROOT : path.resolve(argv[rootAt + 1]),
     requireGit: argv.includes('--require-git') || Boolean(process.env.CI),
   };
 }
@@ -256,6 +253,21 @@ const ALLOWED_HOST_SUFFIXES = [
 // inline marker so the exception sits on the line it excuses.
 const EXCLUDED_PATHS = [];
 
+// A dotted quad with NO range check: the shape, not the validity test. Callers
+// needing octets in range check them separately (isAllowedAddress) or use
+// IPV4_LITERAL, which builds the range in. Shared because a rule spelled in
+// four places is a rule that can disagree with itself.
+const IPV4_QUAD = '\\d{1,3}(?:\\.\\d{1,3}){3}';
+const IPV4_ONLY = new RegExp(`^${IPV4_QUAD}$`);
+
+// RFC 5737 — the /24s reserved for documentation. A table, not three branches:
+// the next reserved block should be a row.
+const RFC_5737_DOC_NETS = [
+  [192, 0, 2],     // 192.0.2.0/24
+  [198, 51, 100],  // 198.51.100.0/24
+  [203, 0, 113],   // 203.0.113.0/24
+];
+
 /**
  * Addresses that name no machine of ours. Recognising bare IP literals without
  * this turns the repo red on content that is not merely harmless but correct —
@@ -269,11 +281,12 @@ const EXCLUDED_PATHS = [];
 function isAllowedAddress(host) {
   // ── IPv6 ──
   // RFC 3849 reserves 2001:db8::/32 for documentation, the IPv6 twin of the
-  // RFC 5737 blocks below. Both spellings of the second group are accepted.
-  if (/^2001:0?db8:/.test(host) || /^2001:0?db8::/.test(host)) return true;
+  // RFC 5737 blocks below. Both spellings of the second group are accepted, and
+  // the `::`-elided form begins with that same prefix, so one test covers it.
+  if (/^2001:0?db8:/.test(host)) return true;
 
   // ── IPv4 ──
-  if (!/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return false;
+  if (!IPV4_ONLY.test(host)) return false;
   const octets = host.split('.').map(Number);
   if (octets.some(n => n > 255)) return false;
 
@@ -288,9 +301,7 @@ function isAllowedAddress(host) {
 
   // RFC 5737 — reserved for documentation, so they can never be a deployment.
   const [a, b, c] = octets;
-  if (a === 192 && b === 0 && c === 2) return true;        // 192.0.2.0/24
-  if (a === 198 && b === 51 && c === 100) return true;     // 198.51.100.0/24
-  if (a === 203 && b === 0 && c === 113) return true;      // 203.0.113.0/24
+  if (RFC_5737_DOC_NETS.some(net => net[0] === a && net[1] === b && net[2] === c)) return true;
 
   // The cloud instance-metadata address. Identical on every cloud provider and
   // every instance, so it identifies nothing — and naming it IS the security
@@ -418,8 +429,6 @@ const BARE_TOKEN_TLDS = new Set([
   ...INTERNAL_TLDS,
 ]);
 
-const IPV4 = /^\d{1,3}(\.\d{1,3}){3}$/;
-
 // An IPv4 literal with every octet in range. The range check is what keeps
 // `999.1.1.1` and most version-shaped quads out; a four-part version string is
 // genuinely indistinguishable from an address, and this errs toward reporting.
@@ -462,11 +471,6 @@ const BARE_RULE_SKIP_EXTENSIONS = new Set([
 ]);
 
 /**
- * Line indices (0-based) that fall inside a fenced code block, so the
- * bare-token rule can be limited to prose. The fence line itself is included:
- * an info string such as ```bash is not prose either.
- */
-/**
  * Fence languages where the bare-token rule STOPS applying.
  *
  * This is a denylist, and the inversion is the point. Gate 1 masks fenced
@@ -501,9 +505,14 @@ const MASKED_FENCE_LANGUAGES = new Set([
   'csharp', 'c#', 'cpp', 'c++', 'objective-c', 'objc', 'kotlin',
 ]);
 
+// A fence opener or closer: a run of three or more backticks or tildes, then
+// the info string. No `g` flag, so it carries no lastIndex state between lines.
+const FENCE_MARKER = /^\s*(`{3,}|~{3,})\s*([^\s`]*)/;
+
 /**
- * Which lines are masked from the bare-token rule, and whether a fence was left
- * open at end of file.
+ * Line indices (0-based) that are masked from the bare-token rule, and whether
+ * a fence was left open at end of file. The fence line itself is masked: an
+ * info string is not prose either.
  *
  * An unmatched opener masks every line after it to EOF, silently: nothing in
  * the report distinguishes that file from a clean one. In a corpus of hundreds
@@ -520,30 +529,34 @@ const MASKED_FENCE_LANGUAGES = new Set([
  */
 function fencedLineSet(lines) {
   const fenced = new Set();
-  let open = null;
-  let openedAt = -1;
-  let scanning = false;
+  let open = null;       // the opening run itself, or null when outside a block
+  let openedAt = -1;     // where that run began, for the unclosed-fence report
+  let scanning = false;  // is the open block's language still in scope?
+
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^\s*(`{3,}|~{3,})\s*([^\s`]*)/);
+    const fence = lines[i].match(FENCE_MARKER);
+
     if (open === null) {
-      if (m) {
-        open = m[1][0].repeat(m[1].length);
-        openedAt = i;
-        // A program-source block is masked; every other block, tagged or not,
-        // stays in scope for the bare rule.
-        scanning = !MASKED_FENCE_LANGUAGES.has(m[2].toLowerCase());
-        fenced.add(i);
-      }
-    } else {
-      if (!scanning) fenced.add(i);
-      if (m && m[1][0] === open[0] && m[1].length >= open.length) {
-        fenced.add(i);
-        open = null;
-        openedAt = -1;
-        scanning = false;
-      }
+      if (!fence) continue;
+      open = fence[1];
+      openedAt = i;
+      // A program-source block is masked; every other block, tagged or not,
+      // stays in scope for the bare rule.
+      scanning = !MASKED_FENCE_LANGUAGES.has(fence[2].toLowerCase());
+      fenced.add(i);
+      continue;
     }
+
+    if (!scanning) fenced.add(i);
+    // CommonMark: a fence closes only on its OWN character, and only on a run at
+    // least as long as the opener. Accepting `~~~` as a closer for ``` would
+    // disagree with every renderer about where the block ends.
+    const closes = fence && fence[1][0] === open[0] && fence[1].length >= open.length;
+    if (!closes) continue;
+    fenced.add(i);
+    open = null;
   }
+
   return { fenced, unclosedAt: open === null ? -1 : openedAt };
 }
 
@@ -652,15 +665,36 @@ const CREDENTIAL_PATTERNS = [
     kind: 'jwt',
     re: /(?<![A-Za-z0-9_-])(eyJ)([A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,})(?![A-Za-z0-9_-])/g,
   },
+
+  // ── A PEM private key header ──────────────────────────────────────────────
+  // Written with `-{5}` rather than five literal hyphens so this file does not
+  // contain the string it refuses — the same discipline the host examples in
+  // the header follow, and for the same reason. `PUBLIC KEY` is deliberately
+  // not matched: a public key is published on purpose.
+  //
+  // `headerOnly` marks the one pattern with no prefix/body split: the header
+  // ALONE is the finding, so there is nothing to redact and no entropy floor to
+  // consult, and neither gate above applies to it.
+  {
+    kind: 'private key',
+    headerOnly: true,
+    re: /-{5}BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-{5}/g,
+  },
 ];
 
-// A PEM private key header. Written with `-{5}` rather than five literal
-// hyphens so this file does not contain the string it refuses — the same
-// discipline the host examples in the header follow, and for the same reason.
-// `PUBLIC KEY` is deliberately not matched: a public key is published on
-// purpose. The header alone is the finding; there is no body to redact, and
-// printing it discloses no key material.
-const PEM_PRIVATE_KEY = /-{5}BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-{5}/g;
+/**
+ * Run a global regex over one line, calling `onMatch` for each match.
+ *
+ * The patterns here are module-level and `g`-flagged, so they carry `lastIndex`
+ * from the previous line and MUST be reset. Doing that once here is what keeps
+ * every matcher below down to its pattern and its judgement — and what stops
+ * the reset being remembered in one place and forgotten in another.
+ */
+function eachMatch(re, line, onMatch) {
+  re.lastIndex = 0;
+  let m;
+  while ((m = re.exec(line)) !== null) onMatch(m);
+}
 
 /**
  * Credential findings for one line.
@@ -675,30 +709,27 @@ const PEM_PRIVATE_KEY = /-{5}BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY(?: BLOCK)?-{5}/g;
  */
 function findCredentials(line) {
   const found = [];
-  for (const { kind, re } of CREDENTIAL_PATTERNS) {
-    re.lastIndex = 0;
-    let m;
-    while ((m = re.exec(line)) !== null) {
+  for (const { kind, re, headerOnly } of CREDENTIAL_PATTERNS) {
+    eachMatch(re, line, m => {
       const [, prefix, body] = m;
-      if (looksLikePlaceholder(body)) continue;
-      found.push({
-        text: `${prefix}…[${body.length} chars redacted]`,
-        dedupe: m[0],
-        host: null,
-        kind: 'credential',
-        credentialKind: kind,
-      });
-    }
-  }
-  PEM_PRIVATE_KEY.lastIndex = 0;
-  let m;
-  while ((m = PEM_PRIVATE_KEY.exec(line)) !== null) {
-    found.push({ text: m[0], dedupe: m[0], host: null, kind: 'credential', credentialKind: 'private key' });
+      // A headerOnly pattern has no body, so neither the entropy floor nor the
+      // redaction applies: the header itself is the whole finding.
+      if (!headerOnly && looksLikePlaceholder(body)) return;
+      const text = headerOnly ? m[0] : `${prefix}…[${body.length} chars redacted]`;
+      found.push({ text, dedupe: m[0], host: null, kind: 'credential', credentialKind: kind });
+    });
   }
   return found;
 }
 
 // ─── Matchers ────────────────────────────────────────────────────────────────
+
+/**
+ * A `<userinfo>@` prefix, as a source fragment so matchers 3 and 4 share one
+ * definition. It cannot span whitespace, so it can never reach across a line to
+ * swallow a host that is not actually behind it.
+ */
+const USERINFO = '[\\w.%+-]+@';
 
 /**
  * Normalise an authority component (`user:pass@host:port`) down to a bare
@@ -707,13 +738,6 @@ function findCredentials(line) {
  * host `localhost`, and reporting `ci_user` as a host would be noise that
  * trains readers to ignore this check.
  */
-/**
- * A `<userinfo>@` prefix, as a source fragment so matchers 3 and 4 share one
- * definition. It cannot span whitespace, so it can never reach across a line to
- * swallow a host that is not actually behind it.
- */
-const USERINFO = '[\\w.%+-]+@';
-
 function authorityToHost(authority) {
   let host = authority;
   const at = host.lastIndexOf('@');
@@ -733,162 +757,181 @@ function authorityToHost(authority) {
 }
 
 function looksLikeHost(token) {
-  if (token === 'localhost' || IPV4.test(token)) return true;
+  if (token === 'localhost' || IPV4_ONLY.test(token)) return true;
   return token.includes('.');
 }
+
+// One named pattern per matcher, each with the reasoning that shaped it. They
+// sit out here rather than inside findCandidates because four are built by
+// `new RegExp`, which inside the function meant recompiling them on every line.
+
+// ── 1. Any scheme: `scheme://authority` ──
+// The authority alternation accepts `${...}` / `${{ ... }}` interpolations,
+// including the spaces inside them, so a templated connection string keeps its
+// real host visible. Without this, a GitHub Actions secret reference in the
+// userinfo truncates the match before the `@` and the host is missed.
+const SCHEME_URL_RE = /\b([a-zA-Z][a-zA-Z0-9+.-]*):\/\/((?:\$\{\{[^}]*\}\}|\$\{[^}]*\}|[^\s/?#'"`<>)\]}{\\,;|])+)/g;
+
+// ── 2. Scheme-relative: `//host/` ──
+// The preceding character must not be `:` (that would be a scheme URL, already
+// handled) and must not be part of a word.
+//
+// `.` is a TERMINATOR in the lookahead for the same reason matcher 4's trailing
+// boundary had to stop excluding it: a host at the end of a sentence is followed
+// by a full stop, and a terminator list without one cannot match it. The dot
+// stays outside the capture, so the host is already normalised.
+const SCHEME_RELATIVE_RE = /(^|[\s"'`(\[<,;=])\/\/((?:[A-Za-z0-9_-]+\.)+[A-Za-z]{2,}|localhost|\d{1,3}(?:\.\d{1,3}){3})(:\d{1,5})?(?=[./\s"'`)\]>,;]|$)/g;
+
+// ── 3. Bare `host:port` ──
+// Gated on the same TLD list as the bare-token rule, plus `localhost` and IP
+// literals. Without that gate this fires on source references like
+// `UserService.ts:42`, which is a real string in this tree.
+//
+// USERINFO. `ssh deploy@<host>:2222` was invisible because the boundary class
+// excluded `@` on the left, so the match could neither start at the host nor
+// reach it. The fix is to consume `<userinfo>@` as part of the match and hand
+// the whole authority to authorityToHost, which already knows to strip it — it
+// just never got the chance from here. Consuming it also stops the userinfo
+// being reported as a host in its own right: `user.name@<host>` used to report
+// `user.name` (`.name` is a real TLD) beside the host, which is precisely the
+// noise that trains a reader to ignore this check.
+const HOST_PORT_RE = new RegExp(
+  `(^|[^A-Za-z0-9._/@:-])(${USERINFO})?` +
+  `((?:[A-Za-z0-9_-]+\\.)+([A-Za-z]{2,})|localhost|${IPV4_QUAD}):(\\d{2,5})\\b`,
+  'g',
+);
+
+// ── 4. Bare dotted token (no scheme, no port) ──
+// BOUNDARIES. Three characters decide what this can see, and each one was wrong
+// in a way that cost a whole shape:
+//
+//   trailing `.`  a lookahead excluding `.` can NEVER match a host at the end of
+//                 a sentence, and no amount of backtracking rescues it — every
+//                 shorter candidate ends on an excluded character too. Prose
+//                 ends in full stops, so this was the likeliest single miss in
+//                 the file. The lookahead is now `[A-Za-z0-9_-]`, and the
+//                 optional `\.?` after the capture swallows an FQDN root dot
+//                 rather than reading it as a continuation, so `<host>.` is
+//                 reported as `<host>`.
+//   leading `*.`  a wildcard certificate discloses the apex exactly as the bare
+//   leading `.`   form does, and so does a cookie domain. Both are admitted as a
+//                 PREFIX after a real boundary, not by adding `.` to the
+//                 boundary class itself — that would also start a match inside
+//                 `path/to/<file>.<ext>`, which is a different and much noisier
+//                 change.
+//   leading `@`   see matcher 3 above; same fix, same reason.
+const BARE_HOST_RE = new RegExp(
+  `(^|[^A-Za-z0-9._/:@-])(${USERINFO})?\\*?\\.?` +
+  '((?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\\.)+([A-Za-z]{2,}))\\.?(?![A-Za-z0-9_-])',
+  'g',
+);
+
+// IP LITERALS. An address is a host with no name, and matchers 1-3 only ever saw
+// one behind a scheme, a `//` or a port. `The box is at <addr> on the VPN` — the
+// plainest way to write one down — reached neither.
+const BARE_IPV4_RE = new RegExp(`(^|[^A-Za-z0-9._:-])(${IPV4_LITERAL})(?![A-Za-z0-9._-])`, 'g');
+
+// Coarse first, then isIpv6Literal — see its header for why the judgement is not
+// a shape question. The trailing class omits `.` for the same end-of-sentence
+// reason as the bare rule; it keeps `.` on the LEFT so a match can never start
+// inside a dotted quad.
+const BARE_IPV6_RE = /(^|[^0-9A-Za-z:._-])([0-9A-Fa-f:]{3,45})(?![0-9A-Za-z:_-])/g;
+
+// ── 5. Absolute workspace paths ──
+//
+// What leaks here is the USERNAME, so every prefix that precedes one belongs in
+// the pattern, not just the two obvious ones:
+//
+//   /Volumes/<vol>/<user>/    an external disk on macOS, where a checkout very
+//                             plausibly lives
+//   -Users-<user>-            the MANGLED form. Agent harnesses name their
+//                             scratch directories by flattening a path's slashes
+//                             to hyphens, so a pasted log line or temp path
+//                             carries the username in a shape the slash-based
+//                             patterns cannot see. This is the likeliest of the
+//                             three to be produced by an agent writing docs,
+//                             which is who writes here.
+//
+// `/root/` is deliberately ABSENT, and it was here once. It fails this
+// paragraph's own test: `root` is the same account on every machine, so
+// `/root/<dir>` discloses no username — there is no per-user segment to
+// disclose, because root's home has no user directory under it. What it did
+// instead was refuse `/root/.cache` and `/root/.cargo`, which are standard in
+// the CI documentation this repo ships in `ci-cd-and-automation`.
+const WORKSPACE_PATH_RE = new RegExp(
+  [
+    '\\/Users\\/[A-Za-z0-9._-]+',
+    '\\/home\\/[A-Za-z0-9._-]+',
+    '\\/Volumes\\/[A-Za-z0-9._-]+\\/[A-Za-z0-9._-]+',
+    '[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+',
+    '-(?:Users|home)-[A-Za-z0-9._-]+-',
+  ].join('|'),
+  'g',
+);
 
 /**
  * Find every host-shaped and workspace-path-shaped string on one line.
  * Returns [{ text, host, kind }]. `host` is null for path findings.
+ *
+ * Each matcher below is one judgement: which of its matches count, and what
+ * they are called. The patterns themselves, and why they are shaped that way,
+ * are above.
  */
 function findCandidates(line, applyBareRule) {
   const found = [];
 
-  // ── 1. Any scheme: `scheme://authority` ────────────────────────────────────
-  // The authority alternation accepts `${...}` / `${{ ... }}` interpolations,
-  // including the spaces inside them, so a templated connection string keeps
-  // its real host visible. Without this, a GitHub Actions secret reference in
-  // the userinfo truncates the match before the `@` and the host is missed.
-  const schemeRe = /\b([a-zA-Z][a-zA-Z0-9+.-]*):\/\/((?:\$\{\{[^}]*\}\}|\$\{[^}]*\}|[^\s/?#'"`<>)\]}{\\,;|])+)/g;
-  let m;
-  while ((m = schemeRe.exec(line)) !== null) {
+  // ── 1. Any scheme: `scheme://authority` ──
+  eachMatch(SCHEME_URL_RE, line, m => {
     const scheme = m[1].toLowerCase();
     const host = authorityToHost(m[2]);
-    if (!host) continue;
+    if (!host) return;
     // For non-network schemes (`chrome://inspect`, `vscode://…`, `file://…`)
     // the authority is an opaque target, not a host. Only flag it when it is
     // actually host-shaped, so `chrome://inspect` stays quiet while the same
     // scheme followed by a dotted host does not.
-    if (!NETWORK_SCHEMES.has(scheme) && !looksLikeHost(host)) continue;
+    if (!NETWORK_SCHEMES.has(scheme) && !looksLikeHost(host)) return;
     found.push({ text: m[0], host, kind: 'url' });
-  }
+  });
 
-  // ── 2. Scheme-relative: `//host/` ─────────────────────────────────────────
-  // The preceding character must not be `:` (that would be a scheme URL,
-  // already handled) and must not be part of a word.
-  //
-  // `.` is a TERMINATOR in the lookahead for the same reason matcher 4's
-  // trailing boundary had to stop excluding it: a host at the end of a sentence
-  // is followed by a full stop, and a terminator list without one cannot match
-  // it. The dot stays outside the capture, so the host is already normalised.
-  const relRe = /(^|[\s"'`(\[<,;=])\/\/((?:[A-Za-z0-9_-]+\.)+[A-Za-z]{2,}|localhost|\d{1,3}(?:\.\d{1,3}){3})(:\d{1,5})?(?=[./\s"'`)\]>,;]|$)/g;
-  while ((m = relRe.exec(line)) !== null) {
+  // ── 2. Scheme-relative: `//host/` ──
+  eachMatch(SCHEME_RELATIVE_RE, line, m => {
     found.push({ text: `//${m[2]}${m[3] || ''}`, host: m[2].toLowerCase(), kind: 'scheme-relative' });
-  }
+  });
 
-  // ── 3. Bare `host:port` ───────────────────────────────────────────────────
-  // Gated on the same TLD list as the bare-token rule, plus `localhost` and IP
-  // literals. Without that gate this fires on source references like
-  // `UserService.ts:42`, which is a real string in this tree.
-  //
-  // USERINFO. `ssh deploy@<host>:2222` was invisible because the boundary class
-  // excluded `@` on the left, so the match could neither start at the host nor
-  // reach it. The fix is to consume `<userinfo>@` as part of the match and hand
-  // the whole authority to authorityToHost, which already knows to strip it —
-  // it just never got the chance from here. Consuming it also stops the userinfo
-  // being reported as a host in its own right: `user.name@<host>` used to report
-  // `user.name` (`.name` is a real TLD) beside the host, which is precisely the
-  // noise that trains a reader to ignore this check.
-  const hostPortRe = new RegExp(
-    `(^|[^A-Za-z0-9._/@:-])(${USERINFO})?` +
-    `((?:[A-Za-z0-9_-]+\\.)+([A-Za-z]{2,})|localhost|\\d{1,3}(?:\\.\\d{1,3}){3}):(\\d{2,5})\\b`,
-    'g',
-  );
-  while ((m = hostPortRe.exec(line)) !== null) {
+  // ── 3. Bare `host:port` ──
+  eachMatch(HOST_PORT_RE, line, m => {
     const host = authorityToHost(`${m[2] || ''}${m[3]}`);
     const tld = (m[4] || '').toLowerCase();
-    if (tld && !BARE_TOKEN_TLDS.has(tld)) continue;
+    if (tld && !BARE_TOKEN_TLDS.has(tld)) return;
     found.push({ text: `${m[3]}:${m[5]}`, host, kind: 'host:port' });
-  }
+  });
 
   // ── 4. Bare dotted token, and bare IP literals (no scheme, no port) ───────
   // Prose only — see the BARE_TOKEN_TLDS header for the two gates and why.
   if (applyBareRule) {
-    // BOUNDARIES. Three characters decide what this can see, and each one was
-    // wrong in a way that cost a whole shape:
-    //
-    //   trailing `.`  a lookahead excluding `.` can NEVER match a host at the
-    //                 end of a sentence, and no amount of backtracking rescues
-    //                 it — every shorter candidate ends on an excluded
-    //                 character too. Prose ends in full stops, so this was the
-    //                 likeliest single miss in the file. The lookahead is now
-    //                 `[A-Za-z0-9_-]`, and the optional `\.?` after the capture
-    //                 swallows an FQDN root dot rather than reading it as a
-    //                 continuation, so `<host>.` is reported as `<host>`.
-    //   leading `*.`  a wildcard certificate discloses the apex exactly as the
-    //   leading `.`   bare form does, and so does a cookie domain. Both are
-    //                 admitted as a PREFIX after a real boundary, not by adding
-    //                 `.` to the boundary class itself — that would also start a
-    //                 match inside `path/to/<file>.<ext>`, which is a different
-    //                 and much noisier change.
-    //   leading `@`   see matcher 3 above; same fix, same reason.
-    const bareRe = new RegExp(
-      `(^|[^A-Za-z0-9._/:@-])(${USERINFO})?\\*?\\.?` +
-      '((?:[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?\\.)+([A-Za-z]{2,}))\\.?(?![A-Za-z0-9_-])',
-      'g',
-    );
-    while ((m = bareRe.exec(line)) !== null) {
+    eachMatch(BARE_HOST_RE, line, m => {
       const tld = m[4].toLowerCase();
-      if (!BARE_TOKEN_TLDS.has(tld)) continue;
+      if (!BARE_TOKEN_TLDS.has(tld)) return;
       const host = authorityToHost(`${m[2] || ''}${m[3]}`);
-      if (!isHostShapedForTld(host, tld)) continue;
+      if (!isHostShapedForTld(host, tld)) return;
       found.push({ text: m[3], host, kind: 'bare host' });
-    }
+    });
 
-    // IP LITERALS. An address is a host with no name, and matchers 1-3 only
-    // ever saw one behind a scheme, a `//` or a port. `The box is at <addr> on
-    // the VPN` — the plainest way to write one down — reached neither.
-    const ipv4Re = new RegExp(`(^|[^A-Za-z0-9._:-])(${IPV4_LITERAL})(?![A-Za-z0-9._-])`, 'g');
-    while ((m = ipv4Re.exec(line)) !== null) {
+    eachMatch(BARE_IPV4_RE, line, m => {
       found.push({ text: m[2], host: m[2], kind: 'bare host' });
-    }
+    });
 
-    // Coarse first, then isIpv6Literal — see its header for why the judgement
-    // is not a shape question. The trailing class omits `.` for the same
-    // end-of-sentence reason as the bare rule; it keeps `.` on the LEFT so a
-    // match can never start inside a dotted quad.
-    const ipv6Re = /(^|[^0-9A-Za-z:._-])([0-9A-Fa-f:]{3,45})(?![0-9A-Za-z:_-])/g;
-    while ((m = ipv6Re.exec(line)) !== null) {
+    eachMatch(BARE_IPV6_RE, line, m => {
       const token = m[2].toLowerCase();
-      if (!isIpv6Literal(token)) continue;
+      if (!isIpv6Literal(token)) return;
       found.push({ text: m[2], host: token, kind: 'bare host' });
-    }
+    });
   }
 
-  // ── 5. Absolute workspace paths ───────────────────────────────────────────
-  //
-  // What leaks here is the USERNAME, so every prefix that precedes one belongs
-  // in the pattern, not just the two obvious ones:
-  //
-  //   /Volumes/<vol>/<user>/    an external disk on macOS, where a checkout
-  //                             very plausibly lives
-  //   -Users-<user>-            the MANGLED form. Agent harnesses name their
-  //                             scratch directories by flattening a path's
-  //                             slashes to hyphens, so a pasted log line or
-  //                             temp path carries the username in a shape the
-  //                             slash-based patterns cannot see. This is the
-  //                             likeliest of the three to be produced by an
-  //                             agent writing docs, which is who writes here.
-  //
-  // `/root/` is deliberately ABSENT, and it was here once. It fails this
-  // paragraph's own test: `root` is the same account on every machine, so
-  // `/root/<dir>` discloses no username — there is no per-user segment to
-  // disclose, because root's home has no user directory under it. What it did
-  // instead was refuse `/root/.cache` and `/root/.cargo`, which are standard in
-  // the CI documentation this repo ships in `ci-cd-and-automation`.
-  const pathRe = new RegExp(
-    [
-      '\\/Users\\/[A-Za-z0-9._-]+',
-      '\\/home\\/[A-Za-z0-9._-]+',
-      '\\/Volumes\\/[A-Za-z0-9._-]+\\/[A-Za-z0-9._-]+',
-      '[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]+',
-      '-(?:Users|home)-[A-Za-z0-9._-]+-',
-    ].join('|'),
-    'g',
-  );
-  while ((m = pathRe.exec(line)) !== null) {
+  // ── 5. Absolute workspace paths ──
+  eachMatch(WORKSPACE_PATH_RE, line, m => {
     found.push({ text: m[0], host: null, kind: 'workspace path' });
-  }
+  });
 
   // ── 6. Credentials ────────────────────────────────────────────────────────
   //
@@ -1000,6 +1043,10 @@ function collectFromGit(root, paths, skipped) {
  * negation (`!`) or `**`. If those appear later, this under-matches — which
  * fails SAFE for this check, because under-matching an ignore rule means
  * scanning MORE files, never fewer.
+ *
+ * A trailing `/` (directory-only) needs no flag of its own: it is stripped from
+ * `core`, so the rule matches the directory by name, and the walk prunes that
+ * directory — which is what excludes the files inside it.
  */
 function loadGitignore(root) {
   const file = path.join(root, '.gitignore');
@@ -1009,23 +1056,18 @@ function loadGitignore(root) {
     .map(l => l.trim())
     .filter(l => l && !l.startsWith('#') && !l.startsWith('!'))
     .map(pattern => {
-      const dirOnly = pattern.endsWith('/');
       const anchored = pattern.startsWith('/');
       const core = pattern.replace(/^\//, '').replace(/\/$/, '');
       const rx = new RegExp(
         '^' + core.split('*').map(s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('[^/]*') + '$'
       );
-      return { rx, dirOnly, anchored, core };
+      return { rx, anchored, core };
     });
 }
 
-function isIgnored(relPath, isDir, rules) {
+function isIgnored(relPath, rules) {
   const segments = relPath.split('/');
   for (const rule of rules) {
-    if (rule.dirOnly && !isDir && !rule.core.includes('/')) {
-      // A directory-only rule still excludes files *inside* that directory;
-      // that is handled by pruning the directory during the walk.
-    }
     if (rule.anchored || rule.core.includes('/')) {
       if (rule.rx.test(relPath)) return true;
       continue;
@@ -1053,12 +1095,12 @@ function walk(dir, rules, out, skipped, root) {
 
     if (entry.isDirectory()) {
       if (entry.name === '.git') { skipped.git = true; continue; }
-      if (isIgnored(rel, true, rules)) { skipped.ignored.push(rel + '/'); continue; }
+      if (isIgnored(rel, rules)) { skipped.ignored.push(rel + '/'); continue; }
       walk(abs, rules, out, skipped, root);
       continue;
     }
 
-    if (isIgnored(rel, false, rules)) { skipped.ignored.push(rel); continue; }
+    if (isIgnored(rel, rules)) { skipped.ignored.push(rel); continue; }
     if (EXCLUDED_PATHS.includes(rel)) { skipped.excluded.push(rel); continue; }
     out.push({ abs, rel });
   }
@@ -1066,114 +1108,99 @@ function walk(dir, rules, out, skipped, root) {
 
 // ─── Main ────────────────────────────────────────────────────────────────────
 
-function main(argv = process.argv.slice(2)) {
-  const { root, requireGit } = parseFlags(argv);
-  const skipped = {
-    git: false, ignored: [], excluded: [], symlinks: [], binary: [],
-    submodules: [], absent: [],
-  };
+/**
+ * Refuse the run outright rather than degrade to the walk. Never returns.
+ *
+ * This is the one place the gate could go quietly wrong. Degrading to the walk
+ * means scanning a set that is smaller than the shipping set in exactly the
+ * ways the header describes, and reporting PASSED over it — the same green,
+ * none of the coverage. Under CI that is refused rather than announced, because
+ * nobody reads a warning in a green job.
+ */
+function refuseGitFallback(root) {
+  console.log(`✗  ${root} is not a git work tree, and git enumeration was required`);
+  console.log(`   git said: ${gitRefusalReason}`);
+  console.log(
+    '   The shipping set comes from `git ls-files`. Falling back to the filesystem walk here\n' +
+    '   would scan a DIFFERENT, SMALLER set — gitignored-but-tracked files and symlink\n' +
+    '   targets would go unread — and still print PASSED. Check out the repository, run\n' +
+    '   from inside it, and make sure `git` is on PATH and owns the checkout.'
+  );
+  console.log(`\nenumeration: none — the ${WALK_MODE} fallback was refused`);
+  console.log('\n1 violation(s) — FAILED');
+  process.exit(1);
+}
 
+/**
+ * The files to scan, and which of the two enumerations produced them. See the
+ * SCOPE section in the header for why those two sets differ, and why the
+ * difference is exactly where a leak hides.
+ */
+function enumerate(root, requireGit, skipped) {
   const paths = gitPaths(root);
-  const mode = paths ? GIT_MODE : WALK_MODE;
-  let files;
+  if (paths) return { mode: GIT_MODE, files: collectFromGit(root, paths, skipped) };
 
-  if (paths) {
-    files = collectFromGit(root, paths, skipped);
-  } else {
-    // The one place this gate could go quietly wrong. Degrading to the walk
-    // means scanning a set that is smaller than the shipping set in exactly the
-    // ways the header describes, and reporting PASSED over it — the same green,
-    // none of the coverage. Under CI that is refused outright rather than
-    // announced, because nobody reads a warning in a green job.
-    if (requireGit) {
-      console.log(`✗  ${root} is not a git work tree, and git enumeration was required`);
-      console.log(`   git said: ${gitRefusalReason}`);
-      console.log(
-        '   The shipping set comes from `git ls-files`. Falling back to the filesystem walk here\n' +
-        '   would scan a DIFFERENT, SMALLER set — gitignored-but-tracked files and symlink\n' +
-        '   targets would go unread — and still print PASSED. Check out the repository, run\n' +
-        '   from inside it, and make sure `git` is on PATH and owns the checkout.'
-      );
-      console.log(`\nenumeration: none — the ${WALK_MODE} fallback was refused`);
-      console.log('\n1 violation(s) — FAILED');
-      process.exit(1);
-    }
-    files = [];
-    walk(root, loadGitignore(root), files, skipped, root);
-  }
+  if (requireGit) refuseGitFallback(root);
 
-  files.sort((a, b) => a.rel.localeCompare(b.rel));
+  const files = [];
+  walk(root, loadGitignore(root), files, skipped, root);
+  return { mode: WALK_MODE, files };
+}
 
+/**
+ * Every violation in one file's text.
+ *
+ * Both gates on the bare-token rule live here because both are properties of
+ * the FILE, not the line: a program-source extension turns it off wholesale, a
+ * fence turns it off for the lines it covers.
+ */
+function scanContents(rel, contents) {
   const violations = [];
-  let scanned = 0;
-  let symlinksRead = 0;
+  const lines = contents.split('\n');
+  const sourceFile = BARE_RULE_SKIP_EXTENSIONS.has(path.extname(rel).toLowerCase());
+  const fences = sourceFile ? null : fencedLineSet(lines);
 
-  // An enumeration that finds nothing satisfies every assertion below without
-  // making one. On a one-way door that is the worst possible way to report
-  // success, so say it plainly instead.
-  if (files.length === 0) {
-    console.log(`✗  no files to scan — ${mode} found nothing, which is not the same as clean`);
-    console.log('\n1 violation(s) — FAILED');
-    // process.exit, not `return`: main() is invoked bare at the bottom of this
-    // file and sets the failing status itself. A `return 1` here printed FAILED
-    // and exited 0 — a check that reports a violation and passes anyway.
-    process.exit(1);
+  // Reported before the line findings for this file, because it is the reason
+  // the line findings below it may be short: everything after an unmatched
+  // opener is masked from the bare rule, silently, to end of file.
+  if (fences && fences.unclosedAt !== -1 && !lines[fences.unclosedAt].includes(ALLOW_MARKER)) {
+    violations.push({
+      rel,
+      line: fences.unclosedAt + 1,
+      text: lines[fences.unclosedAt].trim().slice(0, 40),
+      kind: 'unclosed fence',
+    });
   }
 
-  for (const { abs, rel, symlink } of files) {
-    let contents;
-    if (symlink) {
-      // The blob git stores for a symlink IS the target path, so that string is
-      // what gets published. Reading the link rather than following it is the
-      // only way to see it: following reads some other file's bytes, and the
-      // walk's answer — skip — read nothing at all.
-      contents = fs.readlinkSync(abs);
-      symlinksRead++;
-    } else {
-      const buf = fs.readFileSync(abs);
-      if (isBinary(buf)) { skipped.binary.push(rel); continue; }
-      contents = buf.toString('utf8');
-    }
-    scanned++;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (line.includes(ALLOW_MARKER)) continue;
 
-    const lines = contents.split('\n');
-    const ext = path.extname(rel).toLowerCase();
-    const sourceFile = BARE_RULE_SKIP_EXTENSIONS.has(ext);
-    const fences = sourceFile ? null : fencedLineSet(lines);
-    const fenced = fences && fences.fenced;
+    // `sourceFile` short-circuits, so `fences` is never dereferenced when null.
+    const applyBareRule = !sourceFile && !fences.fenced.has(i);
 
-    // Reported before the line findings for this file, because it is the reason
-    // the line findings below it may be short: everything after an unmatched
-    // opener is masked from the bare rule, silently, to end of file.
-    if (fences && fences.unclosedAt !== -1 && !lines[fences.unclosedAt].includes(ALLOW_MARKER)) {
-      violations.push({
-        rel,
-        line: fences.unclosedAt + 1,
-        text: lines[fences.unclosedAt].trim().slice(0, 40),
-        kind: 'unclosed fence',
-      });
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (line.includes(ALLOW_MARKER)) continue;
-
-      const applyBareRule = !sourceFile && !fenced.has(i);
-
-      const seen = new Set();
-      for (const c of findCandidates(line, applyBareRule)) {
-        if (c.host !== null && isAllowedHost(c.host)) continue;
-        // `dedupe` is the raw match where the report text is redacted, so two
-        // different credentials on one line stay two findings without either
-        // of them reaching the log.
-        const key = `${c.kind}:${c.dedupe || c.text}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        violations.push({ rel, line: i + 1, text: c.text, kind: c.kind });
-      }
+    const seen = new Set();
+    for (const c of findCandidates(line, applyBareRule)) {
+      if (c.host !== null && isAllowedHost(c.host)) continue;
+      // `dedupe` is the raw match where the report text is redacted, so two
+      // different credentials on one line stay two findings without either of
+      // them reaching the log.
+      const key = `${c.kind}:${c.dedupe || c.text}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      violations.push({ rel, line: i + 1, text: c.text, kind: c.kind });
     }
   }
 
+  return violations;
+}
+
+/**
+ * Every violation, the tally, the enumeration that produced it, and — only when
+ * something was found — what to do about it. All of them, not just the first:
+ * whoever fixes this needs the full list from one run.
+ */
+function printReport({ mode, scanned, symlinksRead, skipped, violations }) {
   for (const v of violations) {
     console.log(`${v.rel}:${v.line}: ${v.text}   [${v.kind}]`);
   }
@@ -1208,23 +1235,71 @@ function main(argv = process.argv.slice(2)) {
     );
   }
 
-  if (violations.length > 0) {
-    console.log(
-      `\nA hostname in a public commit is permanent. Remove it, add it to ` +
-      `ALLOWED_HOSTS in scripts/check-no-hosts.js if it is genuinely public ` +
-      `documentation, or mark the line with '${ALLOW_MARKER}' if it is a ` +
-      `deliberate host-shaped fixture. See this script's header before ` +
-      `reaching for the marker.\n` +
-      `A [credential] is worse: deleting the line does not un-publish it. ROTATE ` +
-      `it at the issuer first, then remove it. If it is documentation rather ` +
-      `than a secret, give it a placeholder body — the rule is shaped to allow ` +
-      `those, so it needs no marker.\n` +
-      `An [unclosed fence] is not a hostname: close the fence. Until you do, ` +
-      `every line after it is masked from the bare-token rule, so this run ` +
-      `cannot tell you whether that region is clean.`
-    );
+  if (violations.length === 0) return;
+
+  console.log(
+    `\nA hostname in a public commit is permanent. Remove it, add it to ` +
+    `ALLOWED_HOSTS in scripts/check-no-hosts.js if it is genuinely public ` +
+    `documentation, or mark the line with '${ALLOW_MARKER}' if it is a ` +
+    `deliberate host-shaped fixture. See this script's header before ` +
+    `reaching for the marker.\n` +
+    `A [credential] is worse: deleting the line does not un-publish it. ROTATE ` +
+    `it at the issuer first, then remove it. If it is documentation rather ` +
+    `than a secret, give it a placeholder body — the rule is shaped to allow ` +
+    `those, so it needs no marker.\n` +
+    `An [unclosed fence] is not a hostname: close the fence. Until you do, ` +
+    `every line after it is masked from the bare-token rule, so this run ` +
+    `cannot tell you whether that region is clean.`
+  );
+}
+
+function main(argv = process.argv.slice(2)) {
+  const { root, requireGit } = parseFlags(argv);
+  const skipped = {
+    git: false, ignored: [], excluded: [], symlinks: [], binary: [],
+    submodules: [], absent: [],
+  };
+
+  const { mode, files } = enumerate(root, requireGit, skipped);
+  files.sort((a, b) => a.rel.localeCompare(b.rel));
+
+  // An enumeration that finds nothing satisfies every assertion below without
+  // making one. On a one-way door that is the worst possible way to report
+  // success, so say it plainly instead.
+  if (files.length === 0) {
+    console.log(`✗  no files to scan — ${mode} found nothing, which is not the same as clean`);
+    console.log('\n1 violation(s) — FAILED');
+    // process.exit, not `return`: main() is invoked bare at the bottom of this
+    // file and sets the failing status itself. A `return 1` here printed FAILED
+    // and exited 0 — a check that reports a violation and passes anyway.
     process.exit(1);
   }
+
+  const violations = [];
+  let scanned = 0;
+  let symlinksRead = 0;
+
+  for (const { abs, rel, symlink } of files) {
+    let contents;
+    if (symlink) {
+      // The blob git stores for a symlink IS the target path, so that string is
+      // what gets published. Reading the link rather than following it is the
+      // only way to see it: following reads some other file's bytes, and the
+      // walk's answer — skip — read nothing at all.
+      contents = fs.readlinkSync(abs);
+      symlinksRead++;
+    } else {
+      const buf = fs.readFileSync(abs);
+      if (isBinary(buf)) { skipped.binary.push(rel); continue; }
+      contents = buf.toString('utf8');
+    }
+    scanned++;
+    violations.push(...scanContents(rel, contents));
+  }
+
+  printReport({ mode, scanned, symlinksRead, skipped, violations });
+
+  if (violations.length > 0) process.exit(1);
 }
 
 try {
