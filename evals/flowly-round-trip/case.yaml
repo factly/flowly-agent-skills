@@ -32,7 +32,11 @@ runs: 1
 # Runs only under `--scaffold`, as you, with your environment. It needs:
 #
 #   FLOWLY_MCP_URL          the MCP endpoint, e.g. http://localhost:8000/mcp/
-#                           or https://flowly.example.com/mcp/
+#                           or https://api.flowly.example.com/mcp/ — the API
+#                           origin, not the web one a browser signs in to. A
+#                           two-origin deployment serves no /mcp/ on its web
+#                           host: that shape answers 404, which reads as a
+#                           broken door rather than as the wrong hostname.
 #   FLOWLY_MCP_TOKEN        the bearer token
 #   FLOWLY_EVAL_PROJECT_ID  optional; defaults to the first project the
 #                           instance lists
