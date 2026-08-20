@@ -44,7 +44,7 @@ This skill governs the loop. What belongs in a single task was settled by the `f
 
 ### Enumerate
 
-`list_issues` takes `project_id`, `status`, `assignee` and `release`. **It has no parent filter** — no `parent`, no `parent_identifier`. The children are found by listing the project and filtering client-side:
+`list_issues` filters by `project_id`, `status`, `assignee`, `creator`, `milestone`, `release`, `priority`, `review_state` and `q`, and pages with `offset`. **What it has no filter for is a parent** — no `parent`, no `parent_identifier`. The children are found by listing the project and filtering client-side:
 
 1. `get_issue(parent)` — take the parent's own id and the project it belongs to. Note that this is the internal id, not the `FLO-` identifier: the two are different fields and the filter below compares against the internal one.
 2. `list_issues(project_id=<the parent's project>)` — every summary it returns carries the id of its own parent, in that same internal form.
@@ -55,11 +55,13 @@ Three properties of that list decide whether the result is trustworthy:
 
 | property | consequence |
 |---|---|
-| capped at 250 results | in a project with more issues, an older parent's children can fall outside the window |
-| no pagination | there is no second page to ask for |
+| capped at 250 results | in a project with more issues, an older parent's children can fall outside the first page |
 | truncation is silent | you get a short list, never an error |
+| `offset` pages | a full 250 means there may be more; `offset=250` asks for it |
 
-So the count is the check. Read the parent's task list — `list_planning_docs(parent)` returns the `todo` doc — and compare the number of tasks against the number of children found. If they disagree, the enumeration is incomplete: say so and stop. Do not build the subset you happened to receive; a truncated queue silently drops the oldest work, which is usually the work everything else depends on.
+So the count is the check. Read the parent's task list — `list_planning_docs(parent)` returns the `todo` doc — and compare the number of tasks against the number of children found.
+
+If they disagree, page: a page of exactly 250 means the window ended, not the list. Keep asking with `offset` until a short page comes back, which is the only end-of-list signal there is — no total is returned. If the counts still disagree once the pages are exhausted, the enumeration is genuinely incomplete: say so and stop. Do not build the subset you happened to receive; a truncated queue silently drops the oldest work, which is usually the work everything else depends on.
 
 ### Order
 

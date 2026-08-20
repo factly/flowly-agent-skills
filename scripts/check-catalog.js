@@ -138,7 +138,7 @@ const CROSS_PHASE = 'All';
 const REQUIRED_CONVENTIONS = [
   '### Priority is inverted',
   '### `null` means two different things',
-  '### There is no pagination',
+  '### Only one list tool pages',
   '### Every list is capped',
   '### Unknown arguments are ignored, unknown values are refused',
 ];
