@@ -24,6 +24,8 @@ This skill governs the loop. What belongs in a single task was settled by the `f
 
 **When NOT to use** — an issue whose plan is not approved (plan it first, and wait for the human), a one-line fix with no issue behind it, or a single child handed over on its own with no queue to walk.
 
+**And not a set of unrelated issues.** This loop's queue is *derived* — it is one parent's children, in the order conversion produced from the plan's dependency graph. A handful of small fixes that share no parent has no such queue and no such order, so there is nothing here to walk. That is `/flowly:batch` and the `flowly-batch` skill: a run holds the set, and the human sees it once at the end rather than approving a plan per fix. The difference is where the queue comes from, and it decides which skill applies before anything else does.
+
 ## The Precondition
 
 `get_review(identifier)` on the **parent** issue reports the plan gate. It takes five values, and exactly one of them permits building.
@@ -226,5 +228,7 @@ Before the run stops:
 The `flowly-plan` skill — how the plan, the task list and the gate that precedes this loop are written, why `depends_on` orders the children without reaching them, and why nothing lands on disk.
 
 The `flowly-verify` skill — where the diff, the test output and the log this loop produced are attached, once the children are done. That packet hangs off a loop run; this loop's artifact is the commits.
+
+The `flowly-batch` skill — the same per-issue inner loop over a queue that was *named* rather than derived. Everything about working one issue is shared; what differs is that a batch has no parent, no approved plan and no dependency order, so nothing there may be reasoned about the way this loop reasons about child numbering.
 
 The `incremental-implementation` skill and the `test-driven-development` skill — the inner loop inside step 4 of each child. When a child's verification fails for reasons the child does not explain, the `debugging-and-error-recovery` skill applies before any status is written.

@@ -111,7 +111,15 @@ The matrix is not the whole story. Two rules sit outside it and no autonomy leve
 
 > `this run cannot leave its plan phase until the issue's plan is approved (review_state is planning)`
 
-Level 3's `phase = false` means only "no *additional* run-level acknowledgement". It does not mean "no plan gate". Get the plan approved first; the `flowly-plan` skill owns how. For an **initiative**-targeted run there is no review state to delegate to, so the gate is a human at every level instead. The difference between the two target kinds is *which* gate, never *whether*.
+Level 3's `phase = false` means only "no *additional* run-level acknowledgement". It does not mean "no plan gate". Get the plan approved first; the `flowly-plan` skill owns how. For an **initiative**-targeted run there is no review state to delegate to, so the gate is a human at every level instead.
+
+For an **`issue_set`**-targeted run the move is refused outright, for an agent and a human alike —
+
+> `a run targeting a issue_set has no plan phase to leave: its issues carry their own plan gates, and the batch is reviewed as a whole when the run reaches awaiting_review`
+
+That is not a gate waiting to open. A batch has no plan phase to leave, so the run stays in `plan` for its whole life while its status moves underneath it. Reading `phase: plan` on a batch that is plainly writing code and trying to "correct" it is the mistake this refusal exists to stop.
+
+So across the three kinds the difference is *which* gate — or, for a set, that the phase is not the thing being gated at all — never *whether* there is one.
 
 **`ship` is on at every level.** `completed` is reachable only from `approved`, and `approved` is a human verdict.
 
@@ -149,11 +157,11 @@ Decide who is meant to be in the loop, then pick the level that puts them there.
 
 ### 2. Create or find the loop
 
-`list_loops()` shows the team's definitions; `create_loop(name, goal, target_kind, stopping_condition, default_autonomy)` makes a new one. Loop names are unique within a team, so a name already in use is refused rather than duplicated. `target_kind` is `issue` or `initiative` and the run's target must match it.
+`list_loops()` shows the team's definitions; `create_loop(name, goal, target_kind, stopping_condition, default_autonomy)` makes a new one. Loop names are unique within a team, so a name already in use is refused rather than duplicated. `target_kind` is `issue`, `initiative` or `issue_set`, and the run's target must match it — the loop declares the kind, the run supplies the targets.
 
 ### 3. Start the run
 
-`run_loop(loop_id, target)` — `target` is a `FLO-` identifier or an initiative uuid. The run comes back `queued`, in the `plan` phase, with its gates resolved. Read them off the response and confirm `start` is `false` before assuming the next call will work.
+`run_loop(loop_id, target)` — `target` is a `FLO-` identifier or an initiative uuid. For an `issue_set` loop pass `targets` instead, a list of identifiers in the order they should be worked; give exactly one of the two or the call is refused. The run comes back `queued`, in the `plan` phase, with its gates resolved. Read them off the response and confirm `start` is `false` before assuming the next call will work.
 
 Then `advance_loop_run(run_id, status="running")`.
 
@@ -200,6 +208,7 @@ Every refusal below is the system working. None of them is retryable as sent.
 | `is reserved:` plus a named capability | level 4 or 5 | use 3 or lower |
 | `has no stopping_condition` | level 3 with nothing to stop on | set one on the loop, or run at 2 |
 | `runs against a` … `but the target given is a` | target kind mismatch | the loop's `target_kind` decides which target is legal |
+| `has no plan phase to leave` | a `plan → build` move on an `issue_set` run | nothing to fix — a batch never enters `build`, and its status is what says where the work is |
 
 ## Common Rationalizations
 
@@ -266,3 +275,5 @@ After the verdict:
 The `flowly-plan` skill — the issue's plan gate, which is what an issue-targeted run's `plan → build` move delegates to, and the only way that move ever becomes legal.
 
 The `flowly-build` skill — the work a run wraps when its target is an issue with child issues. A run records the attempt; that loop does the walking.
+
+The `flowly-batch` skill — what an `issue_set` run is for, and the rules that only apply to one: the phase that never moves, one commit per issue per repository, and why such a run is never marked `failed`. Reached from `/flowly:batch`.
