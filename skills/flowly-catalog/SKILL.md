@@ -47,7 +47,8 @@ Task arrives
     │   └── Decomposing a spec into verifiable units ───────────→ planning-and-task-breakdown
     │
     ├── BUILD — write the code
-    │   ├── An approved plan with child issues to work ─────────→ flowly-build
+    │   ├── A queue derived from an approved plan's children ───→ flowly-build
+    │   ├── A queue you named yourself, no parent, no plan ─────→ flowly-batch
     │   ├── The change touches more than one file ──────────────→ incremental-implementation
     │   ├── Any logic, any bug fix, any behaviour change ───────→ test-driven-development
     │   ├── Output quality is dropping, or context is wrong ────→ context-engineering
@@ -96,7 +97,8 @@ Every skill in this pack, and nothing that is not in it. `All` means the skill s
 | Plan | `flowly-plan` | An issue needs its planning docs and its task list written through Flowly |
 | Plan | `flowly-plan-gate` | The plan is written and a human must approve it, or a verdict has landed |
 | Plan | `planning-and-task-breakdown` | A spec has to become small, ordered, verifiable units |
-| Build | `flowly-build` | An approved plan's child issues exist and need working one at a time |
+| Build | `flowly-build` | The issues to work are one parent's children, ordered by its approved plan |
+| Build | `flowly-batch` | The issues to work are a set somebody named — no parent, no plan, no order but yours |
 | Build | `incremental-implementation` | The change touches more than one file, or feels too big to land at once |
 | Build | `test-driven-development` | Any logic is being written, any bug fixed, any behaviour changed |
 | Build | `context-engineering` | A session is starting, tasks are switching, or output quality has dropped |
@@ -146,9 +148,13 @@ Same JSON value, opposite meanings, decided entirely by which tool you called. U
 
 `update_issue` also carries no `review_state` and no `parent_id`: the gate moves only through the review actions, and children are created only by conversion.
 
-### There is no pagination
+### Only one list tool pages
 
-No list tool takes `limit`, `offset`, `cursor` or `page`. `list_issues` takes `project_id`, `status`, `assignee` and `release`, and nothing else. Inventing a paging argument does not page — see the last convention for what it does instead.
+`list_issues` takes `offset`, so `offset=250` is its second page and a short page — fewer than 250 back — is the only end-of-list signal there is. No total is returned.
+
+**Every other list tool has no paging argument at all**: not `offset`, not `limit`, not `cursor`, not `page`. For those, the cap below is the end of what you can see.
+
+`list_issues` also takes far more than the four filters it is often described with — `project_id`, `status`, `assignee`, `creator`, `milestone`, `release`, `priority`, `review_state`, `q` and `offset`. Read the schema rather than a summary of it, here included: inventing an argument that is not there does not filter, and the next convention says what it does instead.
 
 ### Every list is capped
 
@@ -224,7 +230,7 @@ The errors below all look like productivity while they are happening:
 | "I set priority to 0 so it's the lowest" | `0` is unset. Low is `4`. The ramp is inverted and `0` is outside it |
 | "I passed null to unassign it" | On `update_issue` that is a no-op reported as success. The dedicated link tool is what clears it |
 | "The call succeeded, so the filter was applied" | An unknown argument name is dropped silently. A succeeding call proves the request parsed, not that it meant what you thought |
-| "I'll add a limit argument to keep the response small" | There is no pagination. The argument is ignored and you get the capped list either way |
+| "I'll add a limit argument to keep the response small" | There is no `limit` on any list tool. It is ignored and you get the capped list either way. `list_issues` has `offset`, which pages — it does not shrink a page |
 | "I'll re-read the catalog to check I'm still on track" | This document routes and then gets out of the way. Mid-task, the skill you are in is the authority |
 | "The conventions are Flowly-specific, so they don't apply to my inherited skill" | Any skill that reads or writes through Flowly's tools is subject to all five. The tools do not know which skill called them |
 

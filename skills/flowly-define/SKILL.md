@@ -27,7 +27,7 @@ Use these names exactly.
 | tool | does |
 |---|---|
 | `list_projects()` | every project, newest first — an issue belongs to exactly one |
-| `list_issues(project_id, status, assignee, release)` | summaries without descriptions, newest first |
+| `list_issues(q, project_id, status, assignee, …, offset)` | summaries without descriptions, newest first |
 | `get_issue(identifier)` | one issue including its full description |
 | `create_issue(project_id, title, description, status, priority)` | files a new issue and returns its `FLO-` identifier |
 | `triage_issue(identifier, action, assignee, milestone, reason)` | accepts an issue out of `triage`, or declines it with a reason |
@@ -43,9 +43,13 @@ Use these names exactly.
 
 ### 1. Find before you file
 
-There is no search tool. No full-text query, no keyword lookup, nothing that takes a phrase. `list_issues` filters by project, status, assignee and release and returns newest first — that is the whole retrieval surface.
+`list_issues` takes `q`: free text, matched case-insensitively as a substring of an issue's title, description, planning docs **or comments**. A hit that looks unrelated to what you asked is a real hit — the match may be in a doc or a comment — so open it rather than discarding it. A query shorter than two characters matches nothing rather than everything, so an empty page means the query was too short or too specific, never that there is no work.
 
-It is also capped. Every list tool stops at 250 rows, silently: no pagination, no cursor, no flag that says the list was cut. A project with more than 250 issues will hand you a full-looking page that is missing the older half. So narrow with the filters you have before you conclude an issue does not exist, and say which filters you used when you report that it does not.
+Beside `q` it filters by project, status, assignee, creator, milestone, release, priority and review state, and returns newest first.
+
+It is also capped. Every list tool stops at 250 rows, silently — no flag says the list was cut. `list_issues` is the one that can be paged past it, with `offset`; for every other list tool 250 rows is the end of what you can see.
+
+So a project with more than 250 issues hands you a full-looking page that is missing the older half. Narrow with the filters you have, page with `offset` if a page comes back full, and say which filters you used when you report that an issue does not exist.
 
 Read the candidate with `get_issue` — `list_issues` returns summaries without descriptions, so the body you need to judge a match is not in the list.
 
@@ -98,7 +102,7 @@ The same reasoning covers every document a workflow wants to write once and reus
 
 | Rationalization | Reality |
 |---|---|
-| "I searched and the issue does not exist" | There is no search tool. You filtered a newest-first list that silently stops at 250. Say which filters you used, or file the issue and let the duplicate be found. |
+| "I searched and the issue does not exist" | You searched a newest-first list that silently stops at 250. Did you use `q`, did you page with `offset`, and was the query at least two characters? Say which filters you used, or file the issue and let the duplicate be found. |
 | "The list came back short, so that is all of them" | Truncation is silent everywhere except the evidence packet. A short list is not proof of a small project. |
 | "I will write the charter as the research doc, it is close enough" | It is accepted without validation and it displaces the one thing the gate's reader expects to find. Put the convention in the project's assets and the work in its own issue. |
 | "The project needs a constitution before any of this makes sense" | Then that is an issue — `create_issue` — and it gets planned and gated like anything else. It is not a fifth doc kind. |

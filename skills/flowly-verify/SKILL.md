@@ -66,7 +66,7 @@ The consequence that catches people is the last row. Splitting a large artifact 
 
 Two things follow from that, and both are load-bearing:
 
-- **The flag is a report of loss, not an offer of the rest.** Flowly has no pagination anywhere: no cursor, no offset, no page token. There is no second call that returns the missing items, so a raised flag cannot be cleared by fetching more. The only fix is to have attached fewer, larger items in the first place — which means rebuilding the packet, not extending it.
+- **The flag is a report of loss, not an offer of the rest.** The packet has no paging argument of any kind — no cursor, no offset, no page token — so there is no second call that returns the missing items and a raised flag cannot be cleared by fetching more. (`list_issues` does take `offset`; nothing else does, and the packet least of all.) The only fix is to have attached fewer, larger items in the first place — which means rebuilding the packet, not extending it.
 - **The exception exists because of what the packet decides.** A silently truncated issue list costs someone a scroll. A silently truncated evidence packet lets a human approve a run on a subset of its evidence while believing they saw all of it, and that verdict is the thing the gate exists to produce. The flag is there so the reviewer's approval means what it says.
 
 A packet that comes back with the flag raised is not ready for a human. Say so, rebuild it, and hand it over once the flag is clear.
@@ -93,7 +93,7 @@ If the verdict comes back `changes_requested`, the run is not dead. It goes back
 | "The tests passed, I'll say so in a note" | "Tests passed" is a claim. The printed output is evidence. Attach it as `test`. |
 | "The diff is huge, I'll split it across items so it fits" | Nothing needs to fit — the cap counts items, not bytes. Splitting spends slots to deliver the same bytes and leaves the reviewer reassembling it. One item, or a `link`. |
 | "I'll attach a note per file so the reviewer can follow along" | That is one item per file against a 250-item cap, and it is worse evidence than the diff it describes. |
-| "The packet says it truncated, I'll fetch the remaining items" | There is no call that returns them. Flowly has no cursor, no offset and no page token. The flag reports loss; it does not offer recovery. |
+| "The packet says it truncated, I'll fetch the remaining items" | There is no call that returns them. The packet takes no cursor, offset or page token — `list_issues`' `offset` does not reach it. The flag reports loss; it does not offer recovery. |
 | "It truncated but the important items are early, that's fine" | You would be asking a human to approve on a subset they cannot see the edge of. Rebuild it as few substantial items and say what happened. |
 | "It's capped like every other list, so it'll just cut quietly" | This is the one list in Flowly that reports its own truncation. Silence is what everything else does, which is exactly why this one does not. |
 | "I'll write the diff to a file and put the path in a note" | There is no artifact store and no filesystem shared with the reviewer. Inline text or an `http`/`https` URL — those are the only two things that exist. |

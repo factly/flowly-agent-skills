@@ -40,7 +40,7 @@ const ESCAPE_HATCH = 'other / not sure';
 const CONVENTIONS = [
   '### Priority is inverted',
   '### `null` means two different things',
-  '### There is no pagination',
+  '### Only one list tool pages',
   '### Every list is capped',
   '### Unknown arguments are ignored, unknown values are refused',
 ];
@@ -452,13 +452,13 @@ test('a table outside the index section does not feed the parser', () => {
 
 test('fails when a convention subsection is dropped', () => {
   const root = makeSandbox({
-    catalog: catalogMarkdown(BASE_ROWS, CONVENTIONS.filter(h => h !== '### There is no pagination')),
+    catalog: catalogMarkdown(BASE_ROWS, CONVENTIONS.filter(h => h !== '### Only one list tool pages')),
   });
 
   const result = run(root);
 
   assert.equal(result.status, 1, result.stdout + result.stderr);
-  assert.match(result.stdout, /has no `### There is no pagination` subsection/);
+  assert.match(result.stdout, /has no `### Only one list tool pages` subsection/);
 });
 
 test('fails when the conventions section is absent entirely', () => {

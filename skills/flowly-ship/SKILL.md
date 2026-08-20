@@ -99,7 +99,7 @@ Removal **unlinks only**. The issue itself is untouched, keeps its status, and s
 
 Each release carries rollups over its members — `project_count`, `total_count` and `done_count`. They are a reading of what the member issues say, not a claim the release makes about itself, so a release whose rollup shows open issues has open issues whatever its status says. The rollups come back on `list_releases` and on both membership calls.
 
-Listings cap at 250 results, there is no pagination anywhere, and truncation is silent. A release with more members than that returns a short list and no error, so a membership count near the cap is a number to check rather than to trust.
+Listings cap at 250 results and truncation is silent, so a release with more members than that returns a full-looking page and no error. A membership count at the cap is a number to check rather than to trust: `list_issues` takes `offset`, so ask for the next page and keep going until a short one comes back. That is the only end-of-list signal there is.
 
 ## Process
 

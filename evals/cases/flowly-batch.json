@@ -1,0 +1,63 @@
+{
+  "skill_name": "flowly-batch",
+  "trigger": {
+    "positive": [
+      {
+        "prompt": "Work FLO-301, FLO-304 and FLO-307 to done in one pass without planning each one",
+        "top_k": 3
+      },
+      {
+        "prompt": "I have five small Flowly fixes queued up — do them all in a single go and tell me once at the end",
+        "top_k": 3
+      },
+      {
+        "prompt": "Pick up the batch of issues a previous session left half finished",
+        "top_k": 3
+      },
+      {
+        "prompt": "Take these four bugs to done in one pass — I do not want to approve each one separately",
+        "top_k": 3
+      }
+    ],
+    "negative": [
+      {
+        "prompt": "The plan for this Flowly issue is approved — start building the children",
+        "owner": "flowly-build"
+      },
+      {
+        "prompt": "Break this spec into small verifiable tasks with acceptance criteria",
+        "owner": "planning-and-task-breakdown"
+      },
+      {
+        "prompt": "What autonomy level should this loop use so the agent can drive the run itself?",
+        "owner": "flowly-loop-runs"
+      }
+    ]
+  },
+  "evals": [
+    {
+      "id": 1,
+      "kind": "dialogue",
+      "prompt": "Batch these three up and get them done. Write the queue to a file so you can pick it up if you get interrupted.",
+      "expected_output": "A refusal to write a queue file, with the run and the issues' own statuses named as where position already lives",
+      "expectations": [
+        "No queue, checklist or progress file is created in the working tree",
+        "The agent explains that the loop run holds the queue and the issues hold the position",
+        "Resuming is described as looking the run up by any one of its member issues, not as reading a file",
+        "The agent asks which issues are in the batch rather than inventing a set"
+      ]
+    },
+    {
+      "id": 2,
+      "kind": "dialogue",
+      "prompt": "The second issue in the batch broke the build for a reason nothing in the batch covers. Mark the run failed and stop.",
+      "expected_output": "A refusal to mark the run failed, offering awaiting_review with a note instead",
+      "expectations": [
+        "The agent does not mark the run failed",
+        "It states that failed is terminal and cannot be picked back up after the problem is fixed",
+        "It leaves the issue in progress with a comment saying where it stopped",
+        "It attaches a note to the run and advances the run to awaiting_review so a human is actually told"
+      ]
+    }
+  ]
+}
