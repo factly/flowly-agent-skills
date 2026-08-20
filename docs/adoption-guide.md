@@ -44,6 +44,11 @@ Run the lifecycle in order for the project's first real feature:
 /flowly:ship     →  when going live               (shipping-and-launch)
 ```
 
+Off to one side of that order: `/flowly:batch FLO-301 FLO-304 FLO-307` works a named set of
+already-understood issues to done in one pass. Use it when the per-issue ceremony costs more than
+the fixes do — it is not a phase, and it is not a substitute for planning work nobody has thought
+about yet.
+
 `/flowly:build auto` is a good fit for greenfield: you approve the plan once and every task still runs test-driven and commits individually. The four planning docs are living documents on the issue, revise them there while the work is in flight — nothing lands in the working tree, so there is nothing to keep in version control.
 
 ### From the start, treat these as always-on

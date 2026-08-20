@@ -75,6 +75,9 @@ Skills become available as `flowly:<skill>` and the six lifecycle commands as `/
 `/flowly:plan`, `/flowly:build`, `/flowly:test`, `/flowly:review` and `/flowly:ship`. Each command
 takes a Flowly issue identifier and refuses to proceed without one.
 
+`/flowly:batch` ships alongside them and is the exception: it takes a set of identifiers rather than
+one, and works them to done in a single run.
+
 ---
 
 ## 2. Point Claude Code at your instance

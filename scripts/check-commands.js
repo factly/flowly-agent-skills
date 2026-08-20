@@ -2,7 +2,7 @@
 /**
  * check-commands.js
  *
- * CLI that holds the six lifecycle commands in `commands/` to the rules that
+ * CLI that holds the commands in `commands/` to the rules that
  * make them work on every door this fork ships through. Nearly everything it
  * asserts fails SILENTLY in production — a command is skipped, truncated or
  * points at nothing, with no warning anywhere — which is why the rules live in
@@ -10,8 +10,8 @@
  *
  * It asserts the following, and reports each separately:
  *
- *   1. The command set is exactly six — research, plan, build, test, review,
- *      ship — each at `commands/<name>.md`. A missing one is a command users
+ *   1. The command set is exactly `COMMANDS` — the six lifecycle phases plus
+ *      `batch` — each at `commands/<name>.md`. A missing one is a command users
  *      never receive; an extra `.md` anywhere under `commands/` is a slash
  *      command nobody decided to ship, because Claude Code's default scan turns
  *      every markdown file there into one.
@@ -29,8 +29,9 @@
  *      — when the rendered bytes exceed MAX_MIGRATED_COMMAND_SKILL_BYTES
  *      (4000; `command_migration.rs:18`, enforced in `import_command_sources`
  *      at `command_migration.rs:166`).
- *   5. The canonical `## Resolve the issue` block is present verbatim in all
- *      six. This script owns the exact string.
+ *   5. Each command carries its canonical resolution block verbatim — the
+ *      single-issue form, or the set form for the commands in SET_COMMANDS.
+ *      This script owns both exact strings.
  *   6. commands/build.md carries the canonical `## Select the mode` block, and
  *      no other command carries one. Upstream tested its whole argument against
  *      the mode words, so a mode plus an identifier selected single-task mode —
@@ -53,7 +54,7 @@
  * They prove nothing about whether a model obeys either one. Obedience is a
  * behavioural property, measured by the evals in `evals/`, not by reading bytes
  * off disk. Both are needed; neither substitutes for the other. Saying so
- * plainly matters, because "a check asserts none of the six can complete
+ * plainly matters, because "a check asserts no command can complete
  * without an identifier" reads as a guarantee about runtime, and this is a
  * guarantee about text.
  *
@@ -72,9 +73,17 @@ const REPO_ROOT    = path.resolve(__dirname, '..');
 const COMMANDS_DIR = path.join(REPO_ROOT, 'commands');
 const SKILLS_DIR   = path.join(REPO_ROOT, 'skills');
 
-// The six lifecycle phases, in order. This list is the specification: the
-// directory is checked against it in both directions.
-const COMMANDS = ['research', 'plan', 'build', 'test', 'review', 'ship'];
+// The six lifecycle phases in order, then the commands that are not a phase.
+// This list is the specification: the directory is checked against it in both
+// directions.
+const COMMANDS = ['research', 'plan', 'build', 'test', 'review', 'ship', 'batch'];
+
+// Commands whose subject is a SET of issues rather than one of them.
+//
+// A separate list rather than a flag on each command, because it selects which
+// resolution block the body must carry, and that is the one thing about a
+// command this script will not take the command's own word for.
+const SET_COMMANDS = new Set(['batch']);
 
 // Required frontmatter keys. `argument-hint` is what shows the caller that the
 // command takes an issue identifier; without it the whole premise of this
@@ -108,15 +117,15 @@ const SKILL_NAMESPACE = 'flowly';
 
 // ─── The canonical resolution block ──────────────────────────────────────────
 //
-// Byte-identical in all six commands, and owned here rather than in any one of
-// them: six copies with no reader is six chances for one to drift, and the
+// Byte-identical in every command that takes ONE issue, and owned here rather
+// than in any one of them: copies with no reader are chances to drift, and the
 // clause most likely to be trimmed as boilerplate is the refusal — the one
 // clause that stops the agent writing a plan to a local file when it cannot
 // work out which issue it is on. That fallback is the exact failure this
 // distribution exists to prevent, so it is the clause that gets a check.
 //
 // It also has to stay clean under check 3: it appears in every body, so a
-// forbidden token here would close the Codex door for all six at once.
+// forbidden token here would close the Codex door for all of them at once.
 const CANONICAL_BLOCK = [
   '## Resolve the issue',
   '',
@@ -136,6 +145,51 @@ const CANONICAL_BLOCK = [
   'to a local file — every artifact belongs to the issue, and a local file is the exact failure this',
   'distribution exists to prevent.',
 ].join('\n');
+
+// ─── The canonical resolution block, set form (batch only) ───────────────────
+//
+// A SIBLING of the block above rather than a generalisation of it, and that is
+// a deliberate trade. Rewriting `CANONICAL_BLOCK` to cover both shapes would
+// have edited all six existing command bodies to say something vaguer, moved
+// six rows in NOTICE.md, and handed the next upstream merge six more conflicts
+// — all to avoid one more constant here. "Exactly one issue" is the strongest
+// true statement about six of the seven commands, and weakening it everywhere
+// to accommodate the seventh makes six commands' contracts worse.
+//
+// What it keeps, word for word in substance, is the refusal: an unresolved
+// argument must not become a plan written to a local file. That clause is the
+// reason either block is checked at all, so the set form states it too, about
+// the artifacts a batch would otherwise strand.
+//
+// What it adds is the order clause. A batch's order is meaningful — it is
+// stored on the run and a resumed run walks it the same way — so a command
+// that quietly sorted the identifiers would change what the human asked for
+// without saying so.
+const CANONICAL_BATCH_BLOCK = [
+  '## Resolve the issues',
+  '',
+  'This command works on a NAMED SET of Flowly issues, and resolving which ones comes first — before',
+  'reading code, before calling any other tool, before writing anything.',
+  '',
+  '1. **From the invocation arguments.** Claude Code appends them to the end of this body',
+  '   automatically, precisely because this body names no substitution token. Separated by spaces or',
+  '   commas; two or more of them.',
+  '2. **`FLO-1234`, `flo-1234` and the bare `1234` are all accepted.** Flowly\'s tools match an',
+  '   identifier case-insensitively and take the bare number, so pass through the form the human used',
+  '   rather than reformatting it.',
+  '3. **The order given is the order they are worked.** It is stored on the run and a resumed run',
+  '   walks it the same way, so do not sort it and do not regroup it.',
+  '',
+  '**If no identifier can be resolved, stop and ask.** Do not guess, and do not assemble a set out of',
+  'whatever happens to be open — a batch is a set somebody named. And do not fall back to writing a',
+  'plan, a spec, a todo list, a checklist or notes to a local file — every artifact belongs to the',
+  'issues and to the run, and a local file is the exact failure this distribution exists to prevent.',
+].join('\n');
+
+// Which resolution block a command's body must carry, by stem.
+function canonicalBlockFor(stem) {
+  return SET_COMMANDS.has(stem) ? CANONICAL_BATCH_BLOCK : CANONICAL_BLOCK;
+}
 
 // ─── The canonical mode block (build only) ───────────────────────────────────
 //
@@ -258,7 +312,7 @@ function walkMarkdown(dir, out) {
  * of a body *when the body contains no substitution token*. So writing the
  * token buys nothing on the primary door — the arguments arrive either way —
  * and costs the command entirely on the other. A body that names no token is
- * the only shape that works everywhere, which is why the six commands resolve
+ * the only shape that works everywhere, which is why the commands resolve
  * their identifier in prose instead.
  *
  * Returns [{ token, line }] with 1-based line numbers relative to the body.
@@ -342,7 +396,7 @@ function yamlUpperBoundBytes(value) {
  * Not modelled: Codex passes the body and the description through a term
  * rewrite before rendering. The plugin profile carries an empty variant list,
  * so the only substitution available to it is a documentation file name, and
- * none of the six bodies names one. Should that change, the rewrite swaps one
+ * no body names one. Should that change, the rewrite swaps one
  * short file name for another and the headroom this check reports absorbs it.
  */
 function renderedBytes(stem, description, body) {
@@ -391,18 +445,18 @@ function checkCommandSet(present, report) {
     }
   }
   if (errors.length > 0) {
-    errors.push('  ↳ the six lifecycle commands are the distribution; a missing one is a phase users cannot reach.');
+    errors.push('  ↳ these commands are the distribution; a missing one is something users cannot reach.');
   }
 
   const extras = present.filter(p => !expected.has(p));
   for (const p of extras) {
-    errors.push(`not one of the six: ${p}`);
+    errors.push(`not one of the ${COMMANDS.length}: ${p}`);
   }
   if (extras.length > 0) {
     errors.push('  ↳ every markdown file under `commands/` becomes a slash command — the plugin declares no `commands` key, so Claude Code\'s default scan picks up the whole directory.');
   }
 
-  report(errors, 'the command set is exactly six', `${COMMANDS.join(', ')} — nothing missing, nothing extra`);
+  report(errors, `the command set is exactly these ${COMMANDS.length}`, `${COMMANDS.join(', ')} — nothing missing, nothing extra`);
   return errors.length;
 }
 
@@ -492,18 +546,31 @@ function checkRenderedSize(files, report) {
 function checkCanonicalBlock(files, report) {
   const errors = [];
 
-  for (const { rel, parsed } of files) {
+  for (const { rel, stem, parsed } of files) {
     if (!parsed.ok) continue;
-    if (!parsed.body.includes(CANONICAL_BLOCK)) {
-      errors.push(`${rel}: does not contain the canonical \`## Resolve the issue\` block verbatim`);
+    const isSet = SET_COMMANDS.has(stem);
+    if (!parsed.body.includes(canonicalBlockFor(stem))) {
+      const heading = isSet ? 'Resolve the issues' : 'Resolve the issue';
+      errors.push(`${rel}: does not contain the canonical \`## ${heading}\` block verbatim`);
+      if (!isSet && parsed.body.includes(CANONICAL_BATCH_BLOCK)) {
+        errors.push(`  ↳ it carries the SET form. ${stem} takes one issue; add it to SET_COMMANDS or restore the single form.`);
+      }
+      if (isSet && parsed.body.includes(CANONICAL_BLOCK)) {
+        errors.push(`  ↳ it carries the single form, which claims "exactly one Flowly issue" — false for ${stem}, and the agent following it will stop and ask which one you meant.`);
+      }
     }
   }
   if (errors.length > 0) {
-    errors.push('  ↳ the block is owned by CANONICAL_BLOCK in this script. Copy it back byte for byte; do not edit one command\'s copy.');
+    errors.push('  ↳ the blocks are owned by CANONICAL_BLOCK and CANONICAL_BATCH_BLOCK in this script. Copy the right one back byte for byte; do not edit one command\'s copy.');
     errors.push('  ↳ the sentence most likely to be trimmed as boilerplate is the refusal, and it is the one that stops an unresolved identifier turning into a plan written to a local file.');
   }
 
-  report(errors, 'canonical resolution block present verbatim', `identical in all ${files.length} command(s)`);
+  const sets = files.filter(f => SET_COMMANDS.has(f.stem)).length;
+  report(
+    errors,
+    'canonical resolution block present verbatim',
+    `${files.length - sets} single-issue + ${sets} set-issue command(s), each matching its own form`,
+  );
   return errors.length;
 }
 
@@ -637,7 +704,7 @@ function main() {
 
   errorCount += checkCommandSet(present, report);
 
-  // The remaining checks read the six the set is *supposed* to contain, so a
+  // The remaining checks read the set COMMANDS is *supposed* to contain, so a
   // missing file is reported once by check 1 rather than again by every check
   // downstream of it.
   const files = [];

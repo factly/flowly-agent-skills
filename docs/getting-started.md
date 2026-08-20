@@ -106,7 +106,8 @@ Load an agent definition when you need specialized review. For example, ask your
 
 The `commands/` directory contains slash commands for Claude Code:
 
-Every one of them takes a Flowly issue identifier and refuses to proceed without one.
+Every one of them refuses to proceed without a Flowly issue identifier. Six take exactly one;
+`/flowly:batch` takes a set.
 
 | Command | Skill Invoked |
 |---------|---------------|
@@ -116,6 +117,7 @@ Every one of them takes a Flowly issue identifier and refuses to proceed without
 | `/flowly:test` | test-driven-development + flowly-verify |
 | `/flowly:review` | code-review-and-quality + flowly-review |
 | `/flowly:ship` | shipping-and-launch + flowly-ship |
+| `/flowly:batch` | flowly-batch (takes a set: `/flowly:batch FLO-301 FLO-304`) |
 
 The mode word goes *before* the identifier, not after the command: `/flowly:build auto FLO-1234`
 works the whole plan in one pass.

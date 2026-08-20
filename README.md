@@ -30,6 +30,12 @@ rather than at the filesystem, and a check asserts that on every change rather t
 to a local file. Each resolves the identifier before it does anything else, and refuses to proceed
 without one instead of falling back to a local file.
 
+**And one command that is not a phase.** `/flowly:batch` takes a *set* of them —
+`/flowly:batch FLO-301 FLO-304 FLO-307` works several already-understood issues to done in one pass,
+under a single loop run that holds the queue and hands the whole batch to a human once. It is the
+answer to five small fixes costing five approvals, and it is the only command whose subject is more
+than one issue; `scripts/check-commands.js` owns a separate resolution block for that reason.
+
 **Every skill those commands name now exists.** `scripts/check-commands.js` carried an exemption
 list for the ones that did not yet, and that list is now empty — each entry was deleted in the commit
 that made its skill real, because the check is red in both directions and an exemption for a skill
