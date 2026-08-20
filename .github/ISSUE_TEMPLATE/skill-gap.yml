@@ -28,6 +28,7 @@ body:
         - deprecation-and-migration
         - documentation-and-adrs
         - doubt-driven-development
+        - flowly-batch
         - flowly-build
         - flowly-catalog
         - flowly-connect

@@ -224,6 +224,7 @@ about command names and nothing else — but the binding no longer rests entirel
 | `skills/deprecation-and-migration/SKILL.md` | `unchanged` |
 | `skills/documentation-and-adrs/SKILL.md` | `bound` |
 | `skills/doubt-driven-development/SKILL.md` | `bound` |
+| `skills/flowly-batch/SKILL.md` | `new` |
 | `skills/flowly-build/SKILL.md` | `new` |
 | `skills/flowly-catalog/SKILL.md` | `new` |
 | `skills/flowly-connect/SKILL.md` | `new` |

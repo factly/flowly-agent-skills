@@ -48,6 +48,7 @@ Task arrives
     │
     ├── BUILD — write the code
     │   ├── An approved plan with child issues to work ─────────→ flowly-build
+    │   ├── A named set of small issues to work in one pass ────→ flowly-batch
     │   ├── The change touches more than one file ──────────────→ incremental-implementation
     │   ├── Any logic, any bug fix, any behaviour change ───────→ test-driven-development
     │   ├── Output quality is dropping, or context is wrong ────→ context-engineering
@@ -97,6 +98,7 @@ Every skill in this pack, and nothing that is not in it. `All` means the skill s
 | Plan | `flowly-plan-gate` | The plan is written and a human must approve it, or a verdict has landed |
 | Plan | `planning-and-task-breakdown` | A spec has to become small, ordered, verifiable units |
 | Build | `flowly-build` | An approved plan's child issues exist and need working one at a time |
+| Build | `flowly-batch` | Several small issues, already understood, need working in one pass |
 | Build | `incremental-implementation` | The change touches more than one file, or feels too big to land at once |
 | Build | `test-driven-development` | Any logic is being written, any bug fixed, any behaviour changed |
 | Build | `context-engineering` | A session is starting, tasks are switching, or output quality has dropped |
