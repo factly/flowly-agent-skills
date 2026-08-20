@@ -40,6 +40,11 @@ read its comments, and look at the working tree before carrying on.
 reusable recipe, so one such loop serves every batch. Then `run_loop(loop_id, targets=[…],
 autonomy=2)` and `advance_loop_run(run_id, status="running")`.
 
+`run_loop` refuses an empty set, a repeated identifier, and **more than fifty issues** — each before
+the run exists, so a refusal leaves nothing to clean up. Fifty is where the evidence packet would
+start truncating, not a view about how much work belongs in one pass; the smaller question is worth
+asking much earlier, because a set with an internal dependency needs an order, and an order is a plan.
+
 Invoke the flowly:flowly-batch skill for the loop itself: what each issue's turn looks like, why the
 run stays in its plan phase for its whole life, one commit per issue per repository, and why a batch
 that hits trouble is never marked failed.

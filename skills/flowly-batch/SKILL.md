@@ -34,6 +34,18 @@ A loop declares the KIND of target it takes; a run holds the actual targets. So 
 2. `run_loop(loop_id, targets=[...], autonomy=2)`. `targets` is the list of issue identifiers, **in the order they should be worked**. That order is stored and a resumed run walks it the same way.
 3. `advance_loop_run(run_id, status="running")`.
 4. Per issue, in order: `update_issue` to `in_progress`, do the work test-first, commit, `update_issue` to `done`, `attach_evidence`.
+
+### What the set will not accept
+
+Three refusals, all at creation, all before the run row exists — so a rejected call leaves nothing behind to clean up.
+
+| | |
+|---|---|
+| an empty list | a run with nothing to work would sit in `queued` with no way to end. Not a synonym for "no target given" |
+| the same issue twice | the queue would work it twice; the refusal names the identifier that repeated |
+| **more than 50 issues** | past roughly 83, a batch attaching a diff, a test and a log per issue overruns the evidence packet's own cap and the packet starts reporting itself truncated. Fifty stops that happening at all |
+
+The fifty is the machine's limit, not a view about how much work a batch should be. The judgement that decides *that* is smaller and different: **a set with an internal dependency needs an order, and an order is a plan.** A batch is for issues that do not depend on each other. Reaching fifty is a sign the set wanted planning, long before it is a sign the cap is in the way.
 5. `advance_loop_run(run_id, status="awaiting_review")` — which notifies every human on the team.
 6. **Stop.** The verdict is theirs and there is no tool for it.
 
@@ -101,6 +113,7 @@ In every case: comment on the issue in flight, attach the note, advance to `awai
 | "These issues are related, so a batch keeps them together" | A batch has an order, not a dependency graph. It will not stop when a later issue needs an earlier one. Related work belongs under a plan. |
 | "I'll start a fresh run, it's simpler than finding the old one" | A second run over the same issues means two runs claiming the same work and one evidence packet that describes half of it. Look the run up by any member first. |
 | "Nobody needs telling, the work is in the tracker" | Status writes and comments on an unassigned issue reach no inbox. Only the run reaching `awaiting_review` notifies the team. Skipping it means the work is done and nobody knows. |
+| "There are sixty of them — I'll split it into two runs" | Fifty is a signal before it is an obstacle. Sixty independent issues in one pass is a packet no human reviews properly, and two runs does not change that, it just hides it in two places. Ask why there are sixty. |
 | "The human can approve the batch through a tool" | There is no such tool. The verdict is a human action in Flowly's web app. |
 
 ## Red Flags
