@@ -214,6 +214,8 @@ const EXTERNAL_COMMANDS = new Map([
    "Claude Code's built-in plugin manager — README's install block is a transcript of `/plugin marketplace add` and `/plugin install`"],
   ['loop',
    'a harness-provided command, named by two inherited skills as an example of a non-interactive context an interview must not run in'],
+  ['compact',
+   "Claude Code's built-in context compaction — `references/agent-delegation.md` measures where a real run's compaction boundaries fell, and each one was invoked by typing this"],
 ]);
 
 // ─── Report plumbing (the shape check-tool-drift.js prints) ──────────────────
