@@ -32,12 +32,14 @@ user → code-reviewer → report → user
 A slash command that wraps one persona with the project's skills. Saves the user from re-explaining the workflow every time.
 
 ```
-/flowly:review → code-reviewer (with code-review-and-quality skill) → report
+a slash command → one persona (with the relevant skill) → report
 ```
 
 **Use when:** the same single-persona invocation happens repeatedly with the same setup.
 
-**Examples in this repo:** `/flowly:review` and `/flowly:test`. Every command this distribution ships is namespaced, because they arrive inside a plugin: `commands/review.md` is typed `/flowly:review`, and the bare form resolves to nothing at all. There is no simplification command; the `code-simplification` skill is reached from `/flowly:review`, or by name.
+**Examples in this repo: none.** This entry used to name `/flowly:review` and `/flowly:test`, and neither has ever wrapped a persona — grep the whole of `commands/` for `subagent`, `persona` or any persona name and it returns nothing. Both commands invoke *skills* and do the work in the main context, which is Pattern 1. Do not read the pattern back out of them.
+
+Every command this distribution ships is namespaced, because they arrive inside a plugin: `commands/review.md` is typed `/flowly:review`, and the bare form resolves to nothing at all. There is no simplification command; the `code-simplification` skill is reached from `/flowly:review`, or by name.
 
 **Cost:** same as direct invocation. The slash command is just a saved prompt.
 
@@ -51,7 +53,7 @@ Multiple personas operate on the same input concurrently, each producing an inde
 
 ```
                            ┌─→ code-reviewer    ─┐
-/flowly:ship → fan out  ───┼─→ security-auditor ─┤→ merge → go/no-go + rollback
+some command → fan out  ───┼─→ security-auditor ─┤→ merge → go/no-go + rollback
                            └─→ test-engineer    ─┘
 ```
 
@@ -61,7 +63,9 @@ Multiple personas operate on the same input concurrently, each producing an inde
 - The merge step is small enough to stay in the main context
 - Wall-clock latency matters
 
-**Examples in this repo:** `/flowly:ship`.
+**"No shared mutable state" excludes writers, and that is the whole clause.** Readers of one tree are independent of each other; two agents *editing* one tree are not, however disjoint their file lists look. See Pattern 6, which is what a fan-out of writers actually requires.
+
+**Examples in this repo: none.** This entry used to name `/flowly:ship`, which has never fanned out — the fork's release command invokes two skills and bundles a release in the main context. The reference implementation is upstream's own pre-fork ship command, which really did spawn three personas concurrently; the fork's rewrite dropped the orchestration and the example outlived it.
 
 **Cost:** N parallel sub-agent contexts + one merge turn. Higher than direct invocation, but faster wall-clock and produces better reports because each sub-agent stays focused on its single perspective.
 
@@ -110,7 +114,43 @@ main agent → research sub-agent (reads 50 files) → digest → main agent con
 
 **Cost:** one isolated sub-agent context. Worth it any time the alternative is loading hundreds of files into the main context.
 
-**On Claude Code, use the built-in `Explore` subagent** rather than defining a custom research persona. `Explore` runs on Haiku, is denied write/edit tools, and is purpose-built for this pattern. Define a custom research subagent only when `Explore` doesn't fit (e.g. you need a domain-specific system prompt the model wouldn't infer).
+**On Claude Code, use the built-in `Explore` subagent** rather than defining a custom research persona. It is purpose-built for this pattern. Define a custom research subagent only when `Explore` doesn't fit (e.g. you need a domain-specific system prompt the model wouldn't infer).
+
+**Be precise about what `Explore` is denied**, because this entry used to overstate it. Its denylist covers the *built-in* write tools — `Edit`, `Write`, `NotebookEdit` — and not MCP tools, which are inherited from the parent session and not named. Measured 2026-08-21: it holds all 48 `mcp__flowly__*` tools, including `update_issue`, `put_planning_doc` and `convert_todo_to_issues`, and a read-only call returned the parent's own actor identity.
+
+So `Explore` cannot edit a file and can absolutely write to your tracker. For research that is usually fine — nothing asks it to. **Do not build a design whose safety argument is that `Explore` writes nothing**, because that is not what its grant says. If a fan-out needs a helper that provably cannot write, that is a persona with a `tools` allowlist, not a built-in and a hopeful sentence.
+
+---
+
+### 6. Writer fan-out (one writer, isolated context)
+
+A parent walks a queue of work items and hands each one's *implementation* to a subagent, which edits the tree and returns a digest. The parent owns the queue, every durable write and every commit.
+
+```
+parent (queue, tracker, git) → implementer #1 → digest → parent commits
+                             → implementer #2 → digest → parent commits   (after #1, never beside it)
+```
+
+**This is the pattern that looks like Pattern 3 and is not.** Pattern 3's first condition is "no shared mutable state", and a writer *is* shared mutable state — the working tree. Two readers of one tree are independent of each other; two writers of one tree are not, no matter how disjoint their declared file lists look. The clause was doing real work all along; it just happened that every pattern above it was a reader.
+
+**Use when:**
+- A long serial run accumulates each item's reads, diffs and test output in one context
+- The context, not the wall-clock, is what runs out
+- Every item's acceptance is already decided, so the subagent decides nothing
+
+**The invariants, and none of them is optional:**
+- **One writer in flight.** Not a pacing preference — the item is the unit of status, commit and rollback, and two in flight share all three and leave none.
+- **The parent makes every durable write.** Tracker writes and git commands both. `git` is tree-wide, so a subagent sharing the tree cannot scope a command to its own work.
+- **The digest carries evidence, not verdicts.** The parent has delegated its own observation of the verification; the command and its output tail have to come back or the observation did not happen.
+- **The parent stages what the subagent reports it touched**, not what the work item predicted.
+
+**Enforcement is the `tools` allowlist, not the brief.** Subagents inherit the parent's MCP tools by default and plugin agents have `mcpServers` ignored, so a persona that does not narrow `tools` arrives holding every write the parent has. Omit `Agent` too — see *Platform-enforced rules*, where the guarantee that used to make that unnecessary is gone.
+
+**Cost:** one subagent context per item, and no wall-clock gain at all. This pattern buys context and nothing else, and anyone adopting it should say so plainly rather than let "delegated" be read as "parallel".
+
+**Concurrent writers are a different pattern and this catalog does not endorse one.** `isolation: worktree` looks like the answer and branches from the repository's default branch rather than the parent's `HEAD`, so an item depending on a sibling committed earlier in the same run sees a tree without it.
+
+**Examples in this repo:** `flowly-build` and `flowly-batch`. `references/agent-delegation.md` is the contract both follow, and `agents/implementer.md` is the persona.
 
 ---
 
@@ -140,12 +180,17 @@ One subtlety: the `skills` and `mcpServers` frontmatter fields in a persona are 
 
 ### Platform-enforced rules
 
-Two rules in this catalog aren't just convention — Claude Code enforces them:
+⚠️ **This section used to claim more than the platform enforces. Read the correction before relying on it.**
 
-- **"Subagents cannot spawn other subagents"** (verbatim from the docs). Anti-pattern B (persona-calls-persona) and Anti-pattern D (deep persona trees) cannot exist on Claude Code by construction.
-- **"No nested teams"** — teammates cannot spawn their own teams. Same anti-patterns blocked at the team level.
+- **Subagents CAN now spawn subagents**, to a default depth of 3, tunable with `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`. This catalog previously quoted "Subagents cannot spawn other subagents" from the docs and built an argument on top of it: that Anti-pattern B (persona-calls-persona) and Anti-pattern D (deep persona trees) "cannot exist on Claude Code by construction" and would "just fail to load". **That guarantee is gone.** Both anti-patterns are now buildable, and nothing refuses them.
 
-This means you can adopt the patterns in this catalog without worrying about contributors accidentally building the anti-patterns. They'll just fail to load.
+  The mitigation is per-persona and deliberate: **omit `Agent` from the persona's `tools` allowlist.** An allowlist excludes by omission, so naming the tools a persona needs is what removes the one it must not have. `agents/implementer.md` does this and says why.
+
+- **"No nested teams"** — teammates still cannot spawn their own teams. This one holds.
+
+So the anti-patterns below are conventions enforced by review, not by the platform, with the single exception of nested teams. A contributor who builds Anti-pattern D will find it works. That is exactly why it is worth catching in review.
+
+This correction is the reason to distrust "the platform prevents it" as an argument anywhere in this file: the platform's guarantees are the platform's to withdraw, and this one was withdrawn without anything here going red.
 
 ### Built-in subagents to know about
 
@@ -153,7 +198,7 @@ Before defining a custom subagent, check whether one of these covers the role:
 
 | Built-in | Purpose |
 |----------|---------|
-| `Explore` | Read-only codebase search and analysis. Use this for Pattern 5 (research isolation). |
+| `Explore` | Codebase search and analysis. Use this for Pattern 5 (research isolation). **Its description says read-only; its tool grant is not.** Measured 2026-08-21: it holds all 48 `mcp__flowly__*` tools, `update_issue` among them. Read-only is a description of intent, and a description is not an enforcement. If a fan-out needs a helper that provably cannot write, give it a persona with a `tools` allowlist. |
 | `Plan` | Read-only research during plan mode. |
 | `general-purpose` | Multi-step tasks needing both exploration and modification. |
 
@@ -167,7 +212,9 @@ The fields that DO work in plugin agents are: `name`, `description`, `tools`, `d
 
 ### Spawning multiple subagents in parallel
 
-In Claude Code, parallel fan-out (Pattern 3) requires issuing **multiple Agent tool calls in a single assistant turn**. Sequential turns serialize execution. `/flowly:ship` calls this out explicitly. Any new orchestrator command should do the same.
+In Claude Code, parallel fan-out (Pattern 3) requires issuing **multiple Agent tool calls in a single assistant turn**. Sequential turns serialize execution.
+
+This used to add that `/flowly:ship` "calls this out explicitly". It does not, and never has — see Pattern 3. The command that did was upstream's pre-fork release command, in a form this distribution no longer ships. **No command here spawns a subagent in parallel**, so any new orchestrator that wants to is the first, and should say the single-turn rule out loud rather than inherit it from an example that is not there.
 
 ---
 

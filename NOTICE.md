@@ -228,6 +228,7 @@ about command names and nothing else — but the binding no longer rests entirel
 | File | Status |
 |---|---|
 | `agents/code-reviewer.md` | `bound` |
+| `agents/implementer.md` | `new` |
 | `agents/security-auditor.md` | `bound` |
 | `agents/test-engineer.md` | `bound` |
 | `agents/web-performance-auditor.md` | `bound` |
@@ -239,6 +240,7 @@ about command names and nothing else — but the binding no longer rests entirel
 | `commands/ship.md` | `new` |
 | `commands/test.md` | `new` |
 | `references/accessibility-checklist.md` | `unchanged` |
+| `references/agent-delegation.md` | `new` |
 | `references/definition-of-done.md` | `unchanged` |
 | `references/observability-checklist.md` | `unchanged` |
 | `references/orchestration-patterns.md` | `bound` |
