@@ -11,14 +11,24 @@ The original MIT copyright is preserved verbatim in [`LICENSE`](LICENSE) alongsi
 | | |
 |---|---|
 | Upstream | `https://github.com/addyosmani/agent-skills` |
-| Base SHA | `bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1` |
-| Base tag | `upstream-base-bdf76c7` |
-| Upstream commit date | 2026-08-03 |
-| Imported | 2026-08-04 |
+| Base SHA | `df1edb2e05487d0aa6d93c747141e0aed1187f25` |
+| Base tag | `upstream-base-df1edb2` |
+| Upstream commit date | 2026-08-14 |
+| Imported | 2026-08-21 |
 
 Upstream history is preserved: the base SHA is an ancestor of every commit on `main`. The permalink
 to any inherited file at the base is
-`https://github.com/addyosmani/agent-skills/blob/bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1/<path>`.
+`https://github.com/addyosmani/agent-skills/blob/df1edb2e05487d0aa6d93c747141e0aed1187f25/<path>`.
+
+The base moves with each merge, and this row is the second: the fork was imported at
+`bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1` (upstream 2026-08-03, imported 2026-08-04) and moved to the
+row above at upstream's v0.6.7. Moving it is not bookkeeping — every `unchanged` and `bound` claim below
+is a byte comparison against this SHA, so leaving it behind would keep the register green while it
+described a tree that no longer exists.
+
+**A base tag must resolve on a fresh clone to be worth citing.** `upstream-base-bdf76c7` never did:
+it existed only in the working clone that ran the import, and `git ls-remote --tags origin` returned
+nothing at all. A row naming a tag nobody else can resolve is a broken citation in a shipped file.
 
 ## Syncing
 
@@ -54,7 +64,7 @@ hand. The rest went later, as this fork's own replacements were authored.
 | `docs/comparison.md` | Upstream's honest map of how it differs from two other skills collections. It compares *upstream* to them, and this fork is a third thing again; keeping it would have meant maintaining a comparison of a project we are not |
 | `.github/workflows/test-plugin-install.yml` | Upstream's standalone install smoke test. Superseded, not dropped: the `install` job in `.github/workflows/ci.yml` does the same thing and is one of the jobs `gates` requires, so the coverage moved rather than went. It left later than the rest, when CI was wired |
 | `plugin.json` | Antigravity's plugin manifest at the repository root — the counterpart to the marketplace manifest above, and removed with it |
-| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own six at `commands/` — see below |
+| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own seven at `commands/` — see below |
 | `skills/using-agent-skills/SKILL.md` | Upstream's meta-skill, replaced by `skills/flowly-catalog/SKILL.md` — see below |
 | `evals/cases/using-agent-skills.json` | The meta-skill's eval case. Rename detection pairs it with its replacement, so it is a deletion only `--no-renames` can see — see below |
 | `evals/fixtures/using-agent-skills/incident.md` | The meta-skill's eval fixture, paired with its replacement the same way |
@@ -82,7 +92,7 @@ deleted it.
 marketplace manifest above — and was removed with it.
 
 `.claude/commands/` — upstream's eight Claude Code slash commands — went later, not at import, when
-this fork's own six were authored at `commands/`. It is recorded here anyway, because this is the
+this fork's own seven were authored at `commands/`. It is recorded here anyway, because this is the
 section a reader checks to find out what became of upstream's commands: they were replaced, not
 migrated. Nothing was carried across. The plugin had already stopped declaring that directory, so the
 files reached no user; what they still did was load as *project* commands for anyone working in this
@@ -160,10 +170,20 @@ differs from it.
 The register covers **every tracked file** under `skills/`, `references/`, `agents/` and `commands/` —
 not only `SKILL.md`. Everything else in the repository is deliberately outside it, and its absence
 here is not an oversight: `scripts/`, `docs/`, `evals/`, `hooks/`, `.github/`, `.claude/`,
-`.claude-plugin/`, `.codex-plugin/`, and the root files (`README.md`, `CLAUDE.md`, `AGENTS.md`,
-`CONTRIBUTING.md`, `LICENSE`, `NOTICE.md`, `plugin.json`, `.gitignore`, `.gitattributes`). Those are
-fork infrastructure — tooling, CI and prose we maintain outright — and tracking them row by row would
-make the register churn on work that has nothing to do with a merge.
+`.claude-plugin/`, and the root files (`README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+`LICENSE`, `NOTICE.md`, `.gitignore`, `.gitattributes`). Those are fork infrastructure — tooling, CI
+and prose we maintain outright — and tracking them row by row would make the register churn on work
+that has nothing to do with a merge.
+
+This list names trees that exist. `.codex-plugin/` and `plugin.json` were in it until the v0.6.7 merge
+removed them; they are recorded in § Removed at import instead, which is where a resolver looks for a
+path that is gone. A scope list that keeps naming deleted paths slowly stops being readable as a
+statement about the tree.
+
+One consequence worth stating, because it is easy to expect otherwise: an upstream merge that adds
+files only under `scripts/`, `evals/` or `docs/` adds **no** register rows. The v0.6.7 merge brought
+thirteen new files and every one of them landed outside this scope, so the register's row count did
+not move.
 
 `commands/` holds this fork's own lifecycle commands, all `new`. Upstream's Antigravity commands were
 removed from that path at import (above) and upstream's Claude Code commands lived at
