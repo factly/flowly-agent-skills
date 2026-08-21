@@ -99,7 +99,7 @@ Why this fails:
 ## Rules for personas
 
 1. A persona is a single role with a single output format. If you find yourself adding a second role, create a second persona.
-2. **Personas do not invoke other personas.** Composition is the job of slash commands or the user. On Claude Code this is also a hard platform constraint — *"subagents cannot spawn other subagents"* — so the rule is enforced for you.
+2. **Personas do not invoke other personas.** Composition is the job of slash commands or the user. This is a convention you have to enforce, **not a platform guarantee** — Claude Code once refused a persona spawning a persona, and no longer does: subagents nest to a default depth of 3 (`CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`). Enforce it per persona by omitting `Agent` from that persona's `tools` allowlist, the way [`agents/implementer.md`](../agents/implementer.md) does and says why. See [references/orchestration-patterns.md](../references/orchestration-patterns.md).
 3. A persona may invoke skills (the *how*).
 4. Every persona file ends with a "Composition" block stating where it fits.
 
