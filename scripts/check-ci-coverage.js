@@ -98,7 +98,7 @@ const AGGREGATE_JOB = 'gates';
 // The number of executables this repository ships. See the header: this is the
 // fixed point that makes a DELETED gate visible. Changing it is a deliberate
 // act and belongs in the same commit as the gate it accounts for.
-const EXPECTED_EXECUTABLES = 24;
+const EXPECTED_EXECUTABLES = 26;
 
 function parseRoot(argv) {
   const i = argv.indexOf('--root');
