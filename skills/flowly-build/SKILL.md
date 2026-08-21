@@ -122,13 +122,25 @@ Review verdicts are not statuses. There is no `approved` issue status and no `in
 1. Take the lowest-numbered child that is neither `done` nor `canceled`.
 2. `get_issue(child)`. Its acceptance and verification lines are the contract — read them off the issue rather than from a memory of the plan.
 3. `update_issue(child, status="in_progress")` **before** writing code, so an interrupted run is legible to the next one.
-4. Implement it: a failing test first, then the smallest change that passes it.
-5. Run the child's own verification step and observe the result. A verification that was not run is not evidence, and neither is one whose output nobody read.
-6. Commit once, staging only the files this child touched. Never stage everything.
+4. Implement it in a subagent — the `flowly:implementer` persona, briefed with the acceptance and verification lines you just read. See *Delegating the implementation* below.
+5. Read the digest it returns. Its verification field carries the command that was run and the tail of that command's real output; a field asserting a result with no command text in it is malformed, and a malformed digest stops the child rather than being accepted. A verification that was not run is not evidence, and neither is one whose output nobody read.
+6. Commit once, staging the files **the digest reports were touched**. Never stage everything, and do not stage from the child's `Files:` line instead — that was a prediction made before the work, and the digest is the record of it.
 7. `update_issue(child, status="done")` — only once the commit exists.
 8. Return to step 1.
 
 One commit per child, containing only that child's work, is what makes each child a clean rollback point. Two children in one commit collapses two rollback points into none. At every moment in that cycle exactly one child is in flight — the queue is walked, not fanned out.
+
+### Delegating the implementation
+
+Step 4 runs in a subagent because a long run otherwise accumulates every child's reads, diffs and test output in one context. Measured on a real eight-child run: the parent's context grew by 280,580 tokens, around 29,000 per child, and finished at 394,288 — a run half again that size does not fit anywhere.
+
+**This buys context, not wall-clock.** It is the same loop, the same order, one child in flight, the same commit per child. Exactly as `auto` removes the human step between children and nothing else, delegation removes the child's working context from the parent and nothing else. A run does not get faster; it gets further before it degrades. Say so to anyone who expects otherwise.
+
+**Everything durable stays with you.** You keep the queue, the dependency graph, every `update_issue`, every `add_comment`, every git command including the commit, and the dirty-tree precondition. The subagent implements and reports; it writes nothing that outlives it. This is not a division of labour you can renegotiate per child — it is what keeps one actor's name on the issue and keeps an interrupted run legible from the tracker alone.
+
+It is also enforced rather than requested. Subagents inherit this session's MCP tools by default, so the persona's `tools` allowlist is what actually removes the Flowly writes; a brief that merely asked would be relying on the same prose-only enforcement that has already failed in this loop.
+
+`../../references/agent-delegation.md` carries the contract in full — the measurement, the division of labour, the digest's four fields, and the costs delegation adds. Read it before changing any of this, and do not restate it here.
 
 ### Stopping
 
@@ -176,6 +188,11 @@ Re-invoking the command re-derives position from the tracker. There is no checkl
 | "I'll set the child to `approved` when it passes" | Not a status. The six values are `triage`, `backlog`, `todo`, `in_progress`, `done`, `canceled`. |
 | "This child turned out to be unnecessary, I'll cancel it" | Dropping a child edits the plan a human approved. `update_issue` will write `canceled` without complaint, which is why the rule is here and not in the server. Stop and report; write it only on a human's recorded decision. |
 | "I finished the child, I'll set it back to `backlog` for review" | `backlog` is where conversion put it. Writing it back destroys the resume record. Built work is judged on the loop run, not by moving an issue backwards. |
+| "Delegation means I can run the next child while this one finishes" | It does not. One child in flight is unchanged; the subagent is where the child's context lives, not a second worker. Delegation buys context, not wall-clock. |
+| "The subagent said the tests pass, that's the verification observed" | It is a claim, not evidence. The digest must carry the command and the tail of its output, and you must read them. A verdict with no command text is a malformed digest, not a terse one. |
+| "The subagent has the Flowly tools anyway, so it may as well mark the child done" | It should not have them — the persona's allowlist is what removes them, and that is the mechanism, not a formality. Two actors writing one issue makes the tracker unreadable to the next run. |
+| "I'll stage the files the child's `Files:` line predicted" | Stage what the digest reports was touched. `Files:` was written before the work and is measurably narrower than the change; staging from it silently drops real edits. |
+| "The child is tiny, delegating it is overhead" | The cheapest measured child still cost the parent 11,863 tokens it never gets back. The overhead of a subagent is paid once; the context is carried for the rest of the run. |
 
 ## Red Flags
 
@@ -196,6 +213,11 @@ Re-invoking the command re-derives position from the tracker. There is no checkl
 - An `in_progress` child adopted, or restarted, without reading it first
 - A planning artefact, checklist or task list written to the working tree at any point
 - An early stop with no comment on the child that was in flight
+- A digest accepted whose verification field carries a verdict but no command text
+- Files staged from the child's `Files:` line rather than from what the digest reported
+- A subagent asked to write a status, a comment or a commit, or handed a git command to run
+- Two subagents spawned at once, or one spawned before the previous child reached `done`
+- Delegation described to a human as making the run faster
 
 ## Verification
 
@@ -214,7 +236,8 @@ For each child, before moving on:
 - [ ] It is the only child in flight
 - [ ] Its status was set to `in_progress` before any code was written
 - [ ] Its acceptance and verification were read from the issue itself
-- [ ] Its verification was run and the output observed
+- [ ] Its verification was run and the output observed — as a command and its output, not a verdict
+- [ ] The digest's file list, not the child's `Files:` line, is what was staged
 - [ ] Exactly one commit exists, staging only the files this child touched
 - [ ] Its status was set to `done` only after that commit existed
 
@@ -230,6 +253,8 @@ Before the run stops:
 The `flowly-plan` skill — how the plan, the task list and the gate that precedes this loop are written, why `depends_on` orders the children without reaching them, and why nothing lands on disk.
 
 The `flowly-verify` skill — where the diff, the test output and the log this loop produced are attached, once the children are done. That packet hangs off a loop run; this loop's artifact is the commits.
+
+`../../references/agent-delegation.md` — the delegation contract this loop's step 4 follows: what the parent keeps and why, the digest's four fields, the measurement that motivated it, and the two things delegation makes worse. The `flowly:implementer` persona in `agents/` is the other half.
 
 The `flowly-batch` skill — the same per-issue inner loop over a queue that was *named* rather than derived. Everything about working one issue is shared; what differs is that a batch has no parent, no approved plan and no dependency order, so nothing there may be reasoned about the way this loop reasons about child numbering.
 
