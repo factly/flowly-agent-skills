@@ -125,8 +125,9 @@ and leave none of them. The transcript shows that rule was broken in this run �
 open at once, for 3m18s and then 5m15s.
 
 Nothing went wrong. That is the point worth recording: **the invariant was violated by an agent
-following the skill, and no gate, no tool and no human noticed until a transcript was read weeks
-later.** Prose asking for restraint was the only thing enforcing it, and prose is what failed.
+following the skill, and no gate, no tool and no human noticed at the time.** It surfaced only
+because a transcript was read afterwards for an unrelated reason. Prose asking for restraint was the
+only thing enforcing it, and prose is what failed.
 
 This is the same shape as the constraint delegation depends on. A brief that merely *asks* a subagent
 not to write to Flowly or not to run git is relying on the mechanism that has now been measured
@@ -141,7 +142,7 @@ failing in this exact loop. Where an allowlist can enforce a rule instead, it sh
 - **The floor is 47,196, not zero.** The parent's own overhead survives any delegation design, so the
   win to expect is on the 233,384, not on the whole 280,580.
 
-## Limits of this measurement
+### Limits of this measurement
 
 - **n = 1.** One run, one parent, one repository, one kind of work — a merge with heavy conflict
   resolution, which is read-heavy in a way a feature slice may not be.
@@ -151,3 +152,140 @@ failing in this exact loop. Where an allowlist can enforce a rule instead, it sh
   file both grow the context; only one of them can be avoided by delegating.
 - **The session did more than the run.** The 398,400 session peak includes the PR and the release; the
   run's own peak is 394,288, and that is the number to quote.
+
+## The contract
+
+One child in flight, exactly as before. The parent walks the queue; the implementation of the current
+child runs in a subagent whose context is discarded when it returns. Nothing about the queue, the
+order, the gate or the commits changes — **this buys context, not wall-clock**, and a loop that
+adopts it should say so as plainly as `commands/build.md` already says it about `auto`.
+
+### What the parent keeps
+
+Everything durable. The division is not a matter of taste: each row is something a subagent either
+cannot do correctly or cannot be trusted to do at all.
+
+| the parent keeps | because |
+|---|---|
+| the queue, the ordering, the count reconciliation | the dependency graph survives only in the parent's task list, and a subagent holding one child cannot see it |
+| every Flowly write — status, comments, everything | one actor's name belongs on the issue, and an interrupted run must stay legible from the tracker alone |
+| every git command, including the commit | `git` is tree-wide; a subagent sharing the tree cannot scope a command to its own work |
+| the dirty-tree precondition | it is a statement about a tree the subagent shares and did not create |
+| the decision that a child is `done` | `done` means the acceptance holds **and** the commit exists, and only the parent knows the second half |
+| the decision that a child is `canceled` | it changes the shape of a plan a human approved, so it is a human's call carried out by the parent |
+| in `flowly-batch`, whether a cross-repository issue is finished | a subagent cannot know whether a sibling repository landed |
+
+The last row is why parent-only writing is the universal rule rather than a `flowly-build` rule. There
+is no version of the cross-repo case where a subagent has the information to decide.
+
+### Why that is enforced rather than requested
+
+**Subagents inherit the parent session's MCP tools by default**, and a plugin agent's `mcpServers`
+declaration is ignored. So a delegated implementer arrives holding `update_issue` and every other
+Flowly write unless the persona's `tools` allowlist takes them away — and nothing server-side refuses
+a wrong write when it comes.
+
+That the allowlist really does take them away was measured, on 2026-08-21, by probing two agents that
+differ in exactly that respect so both outcomes were reachable:
+
+| agent | `tools` | `mcp__flowly__*` reachable |
+|---|---|---|
+| allowlist naming only built-ins — `Bash, Read, WebFetch, WebSearch` | an allowlist | **none.** Reported the tool absent from its own definitions, and had no `ToolSearch` to reacquire it |
+| no allowlist over MCP — all tools bar six built-ins | effectively none | **all 48**, `update_issue` among them; a read-only `whoami` executed and returned the parent's own actor |
+
+Exclusion by omission is therefore sufficient, and `agents/implementer.md` is the persona that relies
+on it. Two consequences worth carrying:
+
+- **An agent's description is not its enforcement.** The unconstrained agent above is described in the
+  registry as a read-only search agent. It holds every Flowly write tool. Any future design that fans
+  out "read-only" helpers needs a constrained persona of its own, not a stock one and a hopeful
+  sentence.
+- **`Bash` has to stay, so `git` stays reachable.** An implementer runs the verification command, and
+  the verification command needs a shell. The prohibition can only be by name, and it has to name the
+  read-only spellings too — `status`, `diff`, `log`, `show` — because those are the ones that feel
+  safe on the way to `stash`.
+
+### The digest
+
+The subagent's final message is the return value. It is read by a loop, not by a person, and it
+carries four fields.
+
+| field | carries |
+|---|---|
+| `outcome` | `implemented`, `blocked`, or `acceptance-wrong` |
+| `files` | every path created, edited or deleted |
+| `verification` | the command run, verbatim, and the tail of its real output |
+| `notes` | what the other three cannot carry — a surprise, a missing dependency, a reason it stopped |
+
+**`verification` is the field the whole design turns on.** The build loop requires a child's
+verification to be run *and its output observed*; delegation moves the observer inside the subagent,
+so the only thing that keeps the requirement real is that the evidence comes back with it. A field
+reading `tests: pass` satisfies the letter of the loop and destroys the thing it protected, and
+nothing goes red when it happens.
+
+So: **a digest whose `verification` field carries no command text is malformed, and the parent stops
+the child rather than accepting it.** Not a warning, not a note in the commit — a stop.
+
+Be honest about what that buys. A subagent can still fabricate an output tail, and nothing here
+prevents it. The gap narrows from "trust a boolean" to "trust a transcript", which is a real
+improvement and not a proof.
+
+### The file set is reported, not predicted
+
+The parent stages from the digest's `files` field — **what the subagent actually touched**, not what
+the task's `Files:` line predicted it would.
+
+That is deliberate, and it is the opposite of tightening the prediction. `Files:` is optional and is
+measurably narrower than the change it describes: one task named four files for work its own
+description promised across nineteen call sites, and the twenty surfaces that went unhandled kept
+every gate green, because the tests had been written against the four. Making the field *required*
+would not fix that. It would make a bad predictor look authoritative, which is worse than an absent
+one — an absent field invites a look, a confident wrong one does not.
+
+A prediction made before the work cannot be better than a report made after it. So the loop asks for
+the report.
+
+### What delegation costs
+
+Two things get worse, and a reader should meet them here rather than discover them.
+
+**Resumability.** Today an interrupted run leaves the parent holding the full context of the half-done
+child. Under delegation the parent holds a digest that never arrived, because the subagent died
+mid-flight — so the child is `in_progress`, the tree may carry partial edits, and the parent knows
+*less* about them than it would have before. Nothing automatic catches this. What holds is that the
+parent still owns the status write and the commit, so the tracker stays truthful and the recovery path
+is unchanged: read the child, read the tree, do not restart blind.
+
+**A subagent can exhaust its own context.** A child too large for one fresh context returns a digest
+assembled from a summary of itself, and that failure looks exactly like success. The partial-field
+stop above is the immediate catch; the real answer is upstream, in task sizing, where a child that
+overflows a fresh context was mis-sized when the plan was written.
+
+## Not built: parallel implementation
+
+Delegation makes concurrency *look* close, and it is worth writing down why it was not taken, so the
+next person does not rediscover it at the cost of a corrupted tree.
+
+**Read-ahead prefetch** — fanning out helpers to gather context for children not yet reached — is
+plausible and unbuilt. Its value is wall-clock, which is not what the measurement above argues for,
+and prefetch for a child whose predecessor rewrites the code underneath it is stale rather than
+merely wasted. The staleness rule is the hard part and nobody has written it.
+
+**Concurrent implementation across children** is gated behind explicit opt-in, and two facts stand in
+its way:
+
+- **No trustworthy conflict key.** Disjoint `Files:` lines do not imply children that cannot collide,
+  for the reason given above. Overlap would have to be established by pre-flight search rather than
+  taken from the plan.
+- **Worktree isolation branches from the wrong commit.** `isolation: worktree` is real and it does
+  dissolve the shared-tree problem — but the worktree is created **from the repository's default
+  branch, not from the parent session's `HEAD`**. A build loop commits each child in sequence, so a
+  worktree-isolated child sees a tree missing every sibling that landed before it. Under dependency
+  ordering that is not an edge case; it is the normal case, and it breaks precisely the children that
+  depend on one another. The cross-repository case has no worktree story at all.
+
+Anyone picking this up should also pin the task-list document's wire format in the server's own tests
+first. Its dependency line is currently exercised only by a round-trip through its own parser, and a
+round-trip agrees with itself: rename the token in both and every test stays green while readers
+outside the server break. Serial delegation does not care, because it matches children to tasks by
+title and parses nothing. A scheduler would care a great deal.
