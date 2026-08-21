@@ -11,14 +11,24 @@ The original MIT copyright is preserved verbatim in [`LICENSE`](LICENSE) alongsi
 | | |
 |---|---|
 | Upstream | `https://github.com/addyosmani/agent-skills` |
-| Base SHA | `bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1` |
-| Base tag | `upstream-base-bdf76c7` |
-| Upstream commit date | 2026-08-03 |
-| Imported | 2026-08-04 |
+| Base SHA | `df1edb2e05487d0aa6d93c747141e0aed1187f25` |
+| Base tag | `upstream-base-df1edb2` |
+| Upstream commit date | 2026-08-14 |
+| Imported | 2026-08-21 |
 
 Upstream history is preserved: the base SHA is an ancestor of every commit on `main`. The permalink
 to any inherited file at the base is
-`https://github.com/addyosmani/agent-skills/blob/bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1/<path>`.
+`https://github.com/addyosmani/agent-skills/blob/df1edb2e05487d0aa6d93c747141e0aed1187f25/<path>`.
+
+The base moves with each merge, and this row is the second: the fork was imported at
+`bdf76c7c6b7b3b3e01bb15c9fdc42ac5351855c1` (upstream 2026-08-03, imported 2026-08-04) and moved to the
+row above at upstream's v0.6.7. Moving it is not bookkeeping — every `unchanged` and `bound` claim below
+is a byte comparison against this SHA, so leaving it behind would keep the register green while it
+described a tree that no longer exists.
+
+**A base tag must resolve on a fresh clone to be worth citing.** `upstream-base-bdf76c7` never did:
+it existed only in the working clone that ran the import, and `git ls-remote --tags origin` returned
+nothing at all. A row naming a tag nobody else can resolve is a broken citation in a shipped file.
 
 ## Syncing
 
@@ -54,25 +64,35 @@ hand. The rest went later, as this fork's own replacements were authored.
 | `docs/comparison.md` | Upstream's honest map of how it differs from two other skills collections. It compares *upstream* to them, and this fork is a third thing again; keeping it would have meant maintaining a comparison of a project we are not |
 | `.github/workflows/test-plugin-install.yml` | Upstream's standalone install smoke test. Superseded, not dropped: the `install` job in `.github/workflows/ci.yml` does the same thing and is one of the jobs `gates` requires, so the coverage moved rather than went. It left later than the rest, when CI was wired |
 | `plugin.json` | Antigravity's plugin manifest at the repository root — the counterpart to the marketplace manifest above, and removed with it |
-| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own six at `commands/` — see below |
+| `.claude/commands/` | Upstream's eight Claude Code slash commands, replaced by this fork's own seven at `commands/` — see below |
 | `skills/using-agent-skills/SKILL.md` | Upstream's meta-skill, replaced by `skills/flowly-catalog/SKILL.md` — see below |
 | `evals/cases/using-agent-skills.json` | The meta-skill's eval case. Rename detection pairs it with its replacement, so it is a deletion only `--no-renames` can see — see below |
 | `evals/fixtures/using-agent-skills/incident.md` | The meta-skill's eval fixture, paired with its replacement the same way |
 | `skills/idea-refine/scripts/idea-refine.sh` | Created the ideas directory that skill wrote its one-pager into. Under the binding a refined idea becomes a Flowly issue instead — see below |
+| `.codex-plugin/` | The Codex plugin manifest. Kept at import as a door held openable, removed at the v0.6.7 merge when upstream began shipping branded interface metadata inside it — see below |
+| `docs/commandcode-setup.md` | Upstream's Command Code install guide, new in v0.6.7. A fifth door, arriving after this fork had settled on one; a guide to a door we do not ship is a guide to a broken install, same as the four above |
+| `scripts/validate-versions.js`, `scripts/validate-versions-test.js` | Upstream's manifest version checker, new in v0.6.7. It cannot run here: it reads five manifest paths without an existence guard, two of which this fork deleted, and it pins every version to `git describe --tags`, which exits non-zero on a clone with no tags — so it throws before reading a manifest. `scripts/check-manifest-versions.js` carries its intent without the tag coupling, by comparing the two shipped manifests to each other |
+| `scripts/validate-artifact-paths.js`, `scripts/validate-artifact-paths-test.js` | Upstream's planning-artifact path checker, new in v0.6.7. Its allowlist is the convention this fork abolished, and absent files are skipped rather than failed, so on this tree it passed having checked nothing. `scripts/check-binding.js` already enforces the opposite rule and predates it |
 
-`.codex-plugin/plugin.json` is **kept**. The Codex door is not shipped and not tested, but it is held
-openable by two authoring rules that cost nothing: no substitution token in any command body, and
-skill frontmatter limited to `name` and `description`.
+`.codex-plugin/` was **kept at import and removed at the v0.6.7 merge**. The reasoning that kept it was
+that the manifest cost nothing and held a door openable by two authoring rules this fork follows anyway:
+no substitution token in any command body, and skill frontmatter limited to `name` and `description`.
+Its setup guide went at import even then, on the asymmetry that a manifest holds a door openable while a
+published guide promises the door is tested — openable and supported being different claims.
 
-Its setup guide went anyway, and the asymmetry is deliberate: the manifest costs nothing to keep and
-holds a door openable, while a published guide is a promise that the door is tested. Openable and
-supported are different claims, and only one of them is true.
+What ended it was upstream filling that manifest with its own interface metadata, including a
+`developerName` and a skill count. Keeping the file would have meant either shipping upstream's identity
+from our manifest or hand-maintaining a divergence inside it at every future merge, and neither is worth
+a door nothing here tests. `CLAUDE.md` states that Claude Code is the only door this fork ships and
+tests; with the manifest gone that sentence is true rather than nearly true. If Codex support is ever
+wanted it is a deliberate project with CI behind it, not an inherited file that survived because nobody
+deleted it.
 
 `plugin.json` at the repository root was Antigravity's plugin manifest — the counterpart to the
 marketplace manifest above — and was removed with it.
 
 `.claude/commands/` — upstream's eight Claude Code slash commands — went later, not at import, when
-this fork's own six were authored at `commands/`. It is recorded here anyway, because this is the
+this fork's own seven were authored at `commands/`. It is recorded here anyway, because this is the
 section a reader checks to find out what became of upstream's commands: they were replaced, not
 migrated. Nothing was carried across. The plugin had already stopped declaring that directory, so the
 files reached no user; what they still did was load as *project* commands for anyone working in this
@@ -150,10 +170,20 @@ differs from it.
 The register covers **every tracked file** under `skills/`, `references/`, `agents/` and `commands/` —
 not only `SKILL.md`. Everything else in the repository is deliberately outside it, and its absence
 here is not an oversight: `scripts/`, `docs/`, `evals/`, `hooks/`, `.github/`, `.claude/`,
-`.claude-plugin/`, `.codex-plugin/`, and the root files (`README.md`, `CLAUDE.md`, `AGENTS.md`,
-`CONTRIBUTING.md`, `LICENSE`, `NOTICE.md`, `plugin.json`, `.gitignore`, `.gitattributes`). Those are
-fork infrastructure — tooling, CI and prose we maintain outright — and tracking them row by row would
-make the register churn on work that has nothing to do with a merge.
+`.claude-plugin/`, and the root files (`README.md`, `CLAUDE.md`, `AGENTS.md`, `CONTRIBUTING.md`,
+`LICENSE`, `NOTICE.md`, `.gitignore`, `.gitattributes`). Those are fork infrastructure — tooling, CI
+and prose we maintain outright — and tracking them row by row would make the register churn on work
+that has nothing to do with a merge.
+
+This list names trees that exist. `.codex-plugin/` and `plugin.json` were in it until the v0.6.7 merge
+removed them; they are recorded in § Removed at import instead, which is where a resolver looks for a
+path that is gone. A scope list that keeps naming deleted paths slowly stops being readable as a
+statement about the tree.
+
+One consequence worth stating, because it is easy to expect otherwise: an upstream merge that adds
+files only under `scripts/`, `evals/` or `docs/` adds **no** register rows. The v0.6.7 merge brought
+thirteen new files and every one of them landed outside this scope, so the register's row count did
+not move.
 
 `commands/` holds this fork's own lifecycle commands, all `new`. Upstream's Antigravity commands were
 removed from that path at import (above) and upstream's Claude Code commands lived at

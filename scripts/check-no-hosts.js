@@ -176,6 +176,7 @@ const ALLOWED_HOSTS = new Set([
   'abseil.io',
   'genai.owasp.org',
   'claude.ai',
+  'code.claude.com',         // Claude Code's own docs — the hook envelope in hooks/ is quoted from them
   'developer.mozilla.org',
   'docs.djangoproject.com',
   'html.spec.whatwg.org',

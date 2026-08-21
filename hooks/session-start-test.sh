@@ -90,7 +90,7 @@ printf '\r\nControl characters: ESC[\x1b] VT[\x0b] BS[\x08] FF[\x0c]\nNo trailin
 
 # --- Case 5: the catalog exists but cannot be read --------------------------
 # This one passes an existence check and then fails at the read, which is how a
-# payload ends up announcing IMPORTANT with nothing but the preface in it.
+# payload ends up injecting "agent-skills loaded." with no catalog behind it.
 unreadable="$work_dir/unreadable"
 install_hook_at "$unreadable"
 mkdir -p "$unreadable/skills/flowly-catalog"
@@ -128,9 +128,50 @@ const fs = require('fs');
 const PREFACE =
   'agent-skills loaded. Use the flowly-catalog phase tree and skill index to find the right skill for your task.\n\n';
 
+// The envelope every SessionStart hook must emit, quoted from Claude Code's
+// hook reference - the consumer's specification, not ours:
+//
+//   https://code.claude.com/docs/en/hooks#sessionstart
+//
+//   {
+//     "hookSpecificOutput": {
+//       "hookEventName": "SessionStart",
+//       "additionalContext": "..."
+//     }
+//   }
+//
+// Do not re-derive this from what the hook prints. An expected value copied
+// out of the code under test can only ever catch a regression, never a
+// contract that was wrong from the first commit - which is exactly how this
+// suite stayed green over a payload Claude Code was silently discarding. The
+// URL is here so the next reader can re-check the source rather than trust
+// this literal.
+//
+// Silent is the operative word: Claude Code parses any stdout beginning with
+// `{` as JSON and injects nothing but additionalContext. An object carrying
+// other keys parses fine, injects nothing, and reports nothing back to the
+// hook. There is no local signal to assert on, so the shape is the assertion.
+const DOCUMENTED_ENVELOPE =
+  '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"..."}}';
+
 function fail(message) {
   throw new Error(message);
 }
+
+// Every leaf key path in an object, sorted - so the emitted payload can be
+// compared against the documented shape by structure rather than by eyeball.
+// An extra key fails this, which is the case that matters: an unrecognised
+// key is not rejected by the host, it is ignored by it.
+function keyPaths(value, prefix = '') {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return [prefix];
+  }
+  return Object.keys(value)
+    .sort()
+    .flatMap((key) => keyPaths(value[key], prefix ? `${prefix}.${key}` : key));
+}
+
+const EXPECTED_KEY_PATHS = keyPaths(JSON.parse(DOCUMENTED_ENVELOPE)).join(', ');
 
 function parsePayload(label, file) {
   const raw = fs.readFileSync(file, 'utf8');
@@ -148,33 +189,54 @@ function parsePayload(label, file) {
   if (payload === null || typeof payload !== 'object' || Array.isArray(payload)) {
     fail(`${label}: expected a JSON object, got ${JSON.stringify(payload)}`);
   }
-  if (typeof payload.message !== 'string') {
-    fail(`${label}: message is not a string, got ${JSON.stringify(payload.message)}`);
+
+  const actualKeyPaths = keyPaths(payload).join(', ');
+  if (actualKeyPaths !== EXPECTED_KEY_PATHS) {
+    fail(
+      `${label}: envelope is [${actualKeyPaths}], but Claude Code documents ` +
+        `[${EXPECTED_KEY_PATHS}]\n` +
+        `  see https://code.claude.com/docs/en/hooks#sessionstart\n` +
+        `  a payload with the wrong keys is injected nowhere and reports nothing`
+    );
   }
-  if (/\bjq\b/i.test(payload.message)) {
-    fail(`${label}: message still talks about jq, which is no longer a dependency`);
+  if (payload.hookSpecificOutput.hookEventName !== 'SessionStart') {
+    fail(
+      `${label}: hookEventName must be "SessionStart", got ` +
+        JSON.stringify(payload.hookSpecificOutput.hookEventName)
+    );
+  }
+  if (typeof payload.hookSpecificOutput.additionalContext !== 'string') {
+    fail(
+      `${label}: additionalContext is not a string, got ` +
+        JSON.stringify(payload.hookSpecificOutput.additionalContext)
+    );
+  }
+  if (/\bjq\b/i.test(contextOf(payload))) {
+    fail(`${label}: context still talks about jq, which is no longer a dependency`);
   }
   return payload;
 }
 
+// The only part of the envelope Claude Code actually injects.
+function contextOf(payload) {
+  return payload.hookSpecificOutput.additionalContext;
+}
+
 function assertCatalogInjected(label, payload) {
-  if (payload.priority !== 'IMPORTANT') {
-    fail(`${label}: expected IMPORTANT priority, got ${JSON.stringify(payload.priority)}`);
+  if (!contextOf(payload).includes('agent-skills loaded.')) {
+    fail(`${label}: context is missing the startup preface`);
   }
-  if (!payload.message.includes('agent-skills loaded.')) {
-    fail(`${label}: message is missing the startup preface`);
-  }
-  if (!payload.message.includes('# Flowly Skill Catalog')) {
-    fail(`${label}: message is missing flowly-catalog content`);
+  if (!contextOf(payload).includes('# Flowly Skill Catalog')) {
+    fail(`${label}: context is missing flowly-catalog content`);
   }
 }
 
 // JSON.parse succeeding proves nothing about whether the markdown survived.
-// Compare the decoded message against the file on disk byte for byte, so a
+// Compare the decoded context against the file on disk byte for byte, so a
 // mangled backslash, quote, control character or box-drawing glyph fails here.
 function assertRoundTrip(label, payload, sourceFile) {
   const expected = Buffer.concat([Buffer.from(PREFACE, 'utf8'), fs.readFileSync(sourceFile)]);
-  const actual = Buffer.from(payload.message, 'utf8');
+  const actual = Buffer.from(contextOf(payload), 'utf8');
   if (actual.equals(expected)) return;
 
   let at = 0;
@@ -182,7 +244,7 @@ function assertRoundTrip(label, payload, sourceFile) {
   const window = (buffer) =>
     JSON.stringify(buffer.slice(Math.max(0, at - 40), at + 40).toString('utf8'));
   fail(
-    `${label}: message does not round-trip ${sourceFile}\n` +
+    `${label}: context does not round-trip ${sourceFile}\n` +
       `  expected ${expected.length} bytes, got ${actual.length}\n` +
       `  first difference at byte ${at}\n` +
       `  expected: ${window(expected)}\n` +
@@ -231,18 +293,21 @@ if (fixture.endsWith('\n')) {
   fail('hostile-catalog: fixture must not end with a newline - that case is what it covers');
 }
 
+// The envelope has no severity channel, so this branch is told apart from an
+// injected catalog by its context alone. The old "must not claim IMPORTANT"
+// assertion went with the key it read; it is not missing by oversight.
 function assertUnavailableCatalog(label, payload) {
-  if (payload.priority === 'IMPORTANT') {
-    fail(`${label}: must not claim IMPORTANT priority when nothing was injected`);
+  if (contextOf(payload).includes('# Flowly Skill Catalog')) {
+    fail(`${label}: context should not contain catalog content`);
   }
-  if (payload.message.includes('# Flowly Skill Catalog')) {
-    fail(`${label}: message should not contain catalog content`);
+  if (contextOf(payload).includes('agent-skills loaded.')) {
+    fail(`${label}: context claims the catalog loaded when nothing was injected`);
   }
-  if (!/not found/i.test(payload.message)) {
-    fail(`${label}: message does not say the catalog was unavailable: ${JSON.stringify(payload.message)}`);
+  if (!/not found/i.test(contextOf(payload))) {
+    fail(`${label}: context does not say the catalog was unavailable: ${JSON.stringify(contextOf(payload))}`);
   }
-  if (!payload.message.includes('flowly-catalog')) {
-    fail(`${label}: message does not name the missing catalog: ${JSON.stringify(payload.message)}`);
+  if (!contextOf(payload).includes('flowly-catalog')) {
+    fail(`${label}: context does not name the missing catalog: ${JSON.stringify(contextOf(payload))}`);
   }
 }
 

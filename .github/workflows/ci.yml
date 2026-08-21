@@ -112,6 +112,39 @@ jobs:
       - name: Every skill is valid under the open standard, two fields only
         run: bash scripts/validate-standard.sh
 
+  reference-links:
+    name: Reference links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Inherited from upstream and kept at their path, byte for byte, on
+      # purpose: this is a checker the fork wants but does not want to own.
+      # Renaming it — the reflex, given every other gate here is `check-*` —
+      # would move its register row from `unchanged` to `owned` and make every
+      # future merge of it a conflict to resolve, forever, in exchange for a
+      # tidier filename.
+      #
+      # The bug class is one this fork demonstrably had. A `references/<file>.md`
+      # link inside a SKILL.md resolves from the skill's OWN directory, two
+      # levels below the repo root, so it silently points at nothing: 15 of the
+      # 16 such links in the tree were broken, and no gate here could see them
+      # because a dead relative link is not a syntax error. Upstream fixed 11 of
+      # them in the same window this checker arrived in; the last one was
+      # fork-authored, so only this gate would ever have caught it.
+      #
+      # The checker first, then its verdict — a broken checker's green says
+      # nothing about the corpus.
+      - name: The reference-link checker works
+        run: node --test scripts/validate-reference-links-test.js
+
+      - name: Every references/ link in a SKILL.md resolves to a file that exists
+        run: node scripts/validate-reference-links.js
+
   # ── The one-way door ────────────────────────────────────────────────────────
 
   hosts:
@@ -419,6 +452,40 @@ jobs:
       - name: Marketplace and plugin manifests validate with warnings fatal
         run: claude plugin validate --strict .
 
+  manifest-versions:
+    name: Manifest versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Separate from the `manifests` job above, which shells out to a `claude`
+      # install to validate manifest SHAPE. This one is plain node and checks a
+      # different thing: that the two files agree on a number. Keeping them
+      # apart means a slow npm install cannot make this gate flaky, and a red
+      # badge names which of the two questions failed.
+      #
+      # NO `git describe` HERE, DELIBERATELY. Upstream's validate-versions.js
+      # derived the expected version from the nearest tag and was deleted for
+      # it: the call was unguarded and exits non-zero on a tagless clone, and
+      # actions/checkout is shallow by default, so its answer depended on CI's
+      # fetch depth rather than on the repository. See NOTICE.md § Removed at
+      # import. That is also why this job needs no fetch-depth: 0 — it reads two
+      # files and asks git nothing.
+      #
+      # The honest limit is in the script's header: two agreeing sources are one
+      # source, and both being wrong together passes. The independent third
+      # source is a tag, read via `--tag`, and a release job is the only place
+      # one is guaranteed to exist. That mode is not wired here on purpose.
+      - name: The manifest-version checker works
+        run: node --test scripts/check-manifest-versions-test.js
+
+      - name: Both shipped manifests declare the same version
+        run: node scripts/check-manifest-versions.js
+
   install:
     name: Install door
     runs-on: ubuntu-latest
@@ -501,6 +568,7 @@ jobs:
     needs:
       - skills
       - standard
+      - reference-links
       - hosts
       - binding
       - register
@@ -512,6 +580,7 @@ jobs:
       - evals
       - hooks
       - manifests
+      - manifest-versions
       - install
       - ci-coverage
     steps:

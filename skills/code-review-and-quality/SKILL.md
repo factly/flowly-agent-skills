@@ -364,8 +364,8 @@ So the five-axis judgement above is still yours to form and to write down; what 
 
 ## See Also
 
-- For detailed security review guidance, see `references/security-checklist.md`
-- For performance review checks, see `references/performance-checklist.md`
+- For detailed security review guidance, see `../../references/security-checklist.md`
+- For performance review checks, see `../../references/performance-checklist.md`
 
 ## Common Rationalizations
 
