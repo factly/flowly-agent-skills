@@ -33,7 +33,7 @@ A loop declares the KIND of target it takes; a run holds the actual targets. So 
 1. `list_loops` for one whose `target_kind` is `issue_set`, or `create_loop` with that kind. One such loop is reused for every batch — it is a recipe, not a queue.
 2. `run_loop(loop_id, targets=[...], autonomy=2)`. `targets` is the list of issue identifiers, **in the order they should be worked**. That order is stored and a resumed run walks it the same way.
 3. `advance_loop_run(run_id, status="running")`.
-4. Per issue, in order: `update_issue` to `in_progress`, do the work test-first, commit, `update_issue` to `done`, `attach_evidence`.
+4. Per issue, in order: `update_issue` to `in_progress`, delegate the work to a subagent, read the digest it returns, commit, `update_issue` to `done`, `attach_evidence`. See *Delegating the Implementation* below.
 
 ### What the set will not accept
 
@@ -68,6 +68,21 @@ Each issue gets its own commit, staging only that issue's files. That is what ma
 **An issue that touches two repositories takes two commits — one in each.** They are separate histories and nothing can make them atomic. The rule is unchanged: still one commit per issue per repository, still nothing else staged.
 
 The failure that follows from it is the one to plan for. If the run stops between those two commits, one repository has the change and the other does not. Leave the issue `in_progress`, say in a comment which repository landed and which did not, and let the resume finish it. **Never write `done` until every repository the issue touched is committed** — a `done` issue with half its work committed is a tracker that lies to the next run.
+
+## Delegating the Implementation
+
+The work of each issue runs in a subagent — the `flowly:implementer` persona — briefed with that issue's acceptance and verification, returning a digest. You keep the queue and its order, every `update_issue`, every `add_comment`, `attach_evidence`, and every git command including both commits.
+
+This is the same contract `flowly-build` follows, and `../../references/agent-delegation.md` holds it: the division of labour, the digest's four fields, and the measurement behind it. Read it there. It is not restated here, and the two skills must not drift into two versions of it.
+
+**One thing does need saying here, because a batch is where it bites.** A subagent cannot know whether a sibling repository landed. It sees one working tree, it runs no git, and the second commit is in a history it never looked at. So the rule above is not merely a rule the parent happens to enforce — **it is a decision only the parent is in a position to make.** An implementer that reported an issue finished is reporting on the tree in front of it, and on a cross-repository issue that is at most half the answer. Take `done` from your own two commits existing, never from the digest saying the work is complete.
+
+Two consequences follow, and both are already the rule elsewhere in this file:
+
+- The digest's `outcome` is evidence about the code, not a verdict about the issue. Only you can write `done`.
+- A stop between two repositories is still yours to record. The subagent is gone by then; the comment naming which repository landed is written by you.
+
+For the same reason, a batch delegates for the same payoff `flowly-build` does — **context, not wall-clock.** Fifty issues in one context is exactly the accumulation the cap at fifty was not designed to prevent. One issue in flight, unchanged.
 
 ## Never Mark the Run Failed
 
@@ -115,6 +130,9 @@ In every case: comment on the issue in flight, attach the note, advance to `awai
 | "Nobody needs telling, the work is in the tracker" | Status writes and comments on an unassigned issue reach no inbox. Only the run reaching `awaiting_review` notifies the team. Skipping it means the work is done and nobody knows. |
 | "There are sixty of them — I'll split it into two runs" | Fifty is a signal before it is an obstacle. Sixty independent issues in one pass is a packet no human reviews properly, and two runs does not change that, it just hides it in two places. Ask why there are sixty. |
 | "The human can approve the batch through a tool" | There is no such tool. The verdict is a human action in Flowly's web app. |
+| "The subagent says the issue is finished, so it is done" | It is reporting on the tree in front of it. On a cross-repository issue that is at most half the answer, and it ran no git either way. `done` comes from your own commits existing. |
+| "Delegating means I can work two issues at once" | It does not. One issue in flight is unchanged; the subagent is where that issue's context lives, not a second worker. |
+| "I'll let the subagent make the second commit, it's in the other repo anyway" | The subagent runs no git at all, in either repository. Both commits are yours, and so is the comment when a run stops between them. |
 
 ## Red Flags
 
@@ -128,6 +146,10 @@ In every case: comment on the issue in flight, attach the note, advance to `awai
 - The batch finished without the run ever reaching `awaiting_review`
 - An issue widened mid-batch to absorb something the batch did not plan for
 - A batch whose members turn out to depend on each other, worked anyway
+- An issue marked `done` on the strength of the digest rather than of the commits
+- A subagent handed a git command, a status write or `attach_evidence` to call
+- A digest accepted whose verification field carries a verdict but no command text
+- Two subagents in flight, or one spawned before the previous issue reached `done`
 
 ## Verification
 
@@ -143,9 +165,10 @@ For each issue, before moving on:
 
 - [ ] It is the only issue in flight
 - [ ] Its status was `in_progress` before any code was written
-- [ ] Its tests were run and the output read
+- [ ] Its tests were run and the output read — as a command and its output in the digest, not a verdict
+- [ ] What was staged is what the digest reported touched, not what the issue predicted
 - [ ] Exactly one commit exists per repository it touched, staging only its files
-- [ ] It was marked `done` only after every one of those commits existed
+- [ ] It was marked `done` only after every one of those commits existed — on your own evidence, not the digest's
 
 Before stopping:
 
@@ -160,5 +183,7 @@ Before stopping:
 `flowly-loop-runs` — autonomy levels, the three gates, and what a run's status and phase each mean. This skill uses one shape of run; that one covers all of them.
 
 `flowly-build` — the queue derived from an approved plan's child issues. The inner loop per issue is the same; where the queue comes from is not.
+
+`../../references/agent-delegation.md` — the delegation contract both walkers follow, held in one place so this skill and `flowly-build` cannot drift into two versions of it. The `flowly:implementer` persona in `agents/` is the other half.
 
 `test-driven-development` and `incremental-implementation` — the inner loop inside each issue.
