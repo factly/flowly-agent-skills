@@ -59,14 +59,22 @@ hand. The rest went later, as this fork's own replacements were authored.
 | `evals/cases/using-agent-skills.json` | The meta-skill's eval case. Rename detection pairs it with its replacement, so it is a deletion only `--no-renames` can see — see below |
 | `evals/fixtures/using-agent-skills/incident.md` | The meta-skill's eval fixture, paired with its replacement the same way |
 | `skills/idea-refine/scripts/idea-refine.sh` | Created the ideas directory that skill wrote its one-pager into. Under the binding a refined idea becomes a Flowly issue instead — see below |
+| `.codex-plugin/` | The Codex plugin manifest. Kept at import as a door held openable, removed at the v0.6.7 merge when upstream began shipping branded interface metadata inside it — see below |
+| `docs/commandcode-setup.md` | Upstream's Command Code install guide, new in v0.6.7. A fifth door, arriving after this fork had settled on one; a guide to a door we do not ship is a guide to a broken install, same as the four above |
 
-`.codex-plugin/plugin.json` is **kept**. The Codex door is not shipped and not tested, but it is held
-openable by two authoring rules that cost nothing: no substitution token in any command body, and
-skill frontmatter limited to `name` and `description`.
+`.codex-plugin/` was **kept at import and removed at the v0.6.7 merge**. The reasoning that kept it was
+that the manifest cost nothing and held a door openable by two authoring rules this fork follows anyway:
+no substitution token in any command body, and skill frontmatter limited to `name` and `description`.
+Its setup guide went at import even then, on the asymmetry that a manifest holds a door openable while a
+published guide promises the door is tested — openable and supported being different claims.
 
-Its setup guide went anyway, and the asymmetry is deliberate: the manifest costs nothing to keep and
-holds a door openable, while a published guide is a promise that the door is tested. Openable and
-supported are different claims, and only one of them is true.
+What ended it was upstream filling that manifest with its own interface metadata, including a
+`developerName` and a skill count. Keeping the file would have meant either shipping upstream's identity
+from our manifest or hand-maintaining a divergence inside it at every future merge, and neither is worth
+a door nothing here tests. `CLAUDE.md` states that Claude Code is the only door this fork ships and
+tests; with the manifest gone that sentence is true rather than nearly true. If Codex support is ever
+wanted it is a deliberate project with CI behind it, not an inherited file that survived because nobody
+deleted it.
 
 `plugin.json` at the repository root was Antigravity's plugin manifest — the counterpart to the
 marketplace manifest above — and was removed with it.
