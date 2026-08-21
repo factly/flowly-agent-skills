@@ -376,10 +376,14 @@ test('the shipped corpus keeps naming commands, and every one resolves', () => {
   }
 });
 
-test('the four shipped personas name only namespaced commands', () => {
+test('every shipped persona names only namespaced commands', () => {
   // The regression this check was written for, pinned to the files it was found
-  // in. A merge that reverts one of these four `Invoke via:` lines fails here
-  // with the persona named, not only in the aggregate.
+  // in. A merge that reverts one of those `Invoke via:` lines fails here with
+  // the persona named, not only in the aggregate.
+  //
+  // It reads the directory rather than a list, so a persona added later is
+  // covered the day it lands. The name used to say "four"; `implementer.md`
+  // made that five, and a count in a test's name is a claim nothing checks.
   for (const persona of fs.readdirSync(path.join(REPO_ROOT, 'agents'))) {
     if (!persona.endsWith('.md')) continue;
     const text = fs.readFileSync(path.join(REPO_ROOT, 'agents', persona), 'utf8');
