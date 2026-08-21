@@ -30,7 +30,7 @@ Before writing any code, operate in read-only mode:
 - Map dependencies between components
 - Note risks and unknowns
 
-**Do NOT write code during planning.** The output is a plan document written to the issue with `put_planning_doc(kind="plan")` and a task list written with `put_todo_tasks`, not implementation.
+**Do NOT write code during planning.** The output is a plan document written to the issue with `put_planning_doc(kind="plan")` and a task list recorded in the task list target (see Outputs), not implementation.
 
 ### Step 2: Identify the Dependency Graph
 
@@ -78,7 +78,7 @@ Each vertical slice delivers working, testable functionality.
 
 ### Step 4: Write Tasks
 
-Each task follows this structure:
+Each task follows this structure, whether it is written with `put_todo_tasks` or recorded as an item in another tracker (see Outputs):
 
 ```markdown
 ## Task [N]: [Short descriptive title]
@@ -112,7 +112,7 @@ Arrange tasks so that:
 3. Verification checkpoints occur after every 2-3 tasks
 4. High-risk tasks are early (fail fast)
 
-Add explicit checkpoints:
+Add explicit checkpoints to the task list target:
 
 ```markdown
 ## Checkpoint: After Tasks 1-3
@@ -142,10 +142,21 @@ If a task is L or larger, it should be broken into smaller tasks. An agent perfo
 
 ## Outputs
 
-- **Plan document:** Write the implementation plan to the issue with `put_planning_doc(kind="plan")`.
-- **Task list:** Write the checklist-style task list with `put_todo_tasks`, which renders the issue's `todo` doc from your task objects.
+- **Plan document:** Write the implementation plan to the issue with `put_planning_doc(kind="plan")`. Design decisions, risks and open questions do not map cleanly onto individual tracker items, so they stay together in one document rather than being scattered across them.
+- **Task list:** Record each task in the **task list target** (defined below).
 
-Nothing goes into the working tree. These are the outputs the `/flowly:build` command and other downstream tooling read back from the issue.
+Nothing goes into the working tree. No planning artifact is written to a file, and no directory is created to hold one.
+
+### Task List Target
+
+The task list target is where tasks and checkpoints are recorded. It is defined once, here; every other reference in this skill defers to it.
+
+- **In this distribution the target is Flowly, and there is no file fallback.** Write the task list with `put_todo_tasks`, which renders the issue's `todo` doc from your task objects. This is what the `/flowly:build` command and other downstream tooling read back.
+- **Another tracker:** if you are working in a project that keeps its work elsewhere (GitHub Issues, Jira, Linear, `bd`/beads), create one item per task there instead. Map the Step 4 structure onto that tracker's fields: acceptance criteria and verification steps in the item body, dependencies via its own linking mechanism (`bd dep add`, "blocked by", etc.). Record Step 5 checkpoints as items too, or as a checklist in the plan document if it has no natural equivalent.
+
+Upstream's version of this skill makes the working tree the default and a tracker the opt-in. This distribution inverts that, and the reason is the failure mode rather than taste: a soft default requires the consuming project to have designated a tracker, a plugin cannot guarantee that any project did, and what happens when none has is an agent writing a plan into a file nothing will ever read back.
+
+When using a tracker other than Flowly, note it in the plan document (e.g. "Tasks tracked in Linear project FOO") so downstream steps and future sessions know where to look, and keep the plan document's Task List section as an ordered index of item IDs or links rather than a duplicate checklist.
 
 ## Plan Document Template
 
@@ -192,6 +203,8 @@ Nothing goes into the working tree. These are the outputs the `/flowly:build` co
 - [Question needing human input]
 ```
 
+When tasks live in an external tracker, keep the Task List section above as an ordered index of tracker item IDs or links instead of a duplicate checklist.
+
 ## Parallelization Opportunities
 
 When multiple agents or sessions are available:
@@ -212,6 +225,7 @@ When multiple agents or sessions are available:
 ## Red Flags
 
 - Starting implementation without a written task list
+- Writing the task list into the working tree at all, or scattering tasks across two targets
 - Tasks that say "implement the feature" without acceptance criteria
 - No verification steps in the plan
 - All tasks are XL-sized
@@ -225,10 +239,11 @@ Before starting implementation, confirm:
 - [ ] Every task has acceptance criteria
 - [ ] Every task has a verification step
 - [ ] Task dependencies are identified and ordered correctly
+- [ ] Tasks are recorded in the task list target — `put_todo_tasks`, never a file
 - [ ] No task touches more than ~5 files
 - [ ] Checkpoints exist between major phases
 - [ ] The human has reviewed and approved the plan
 
 ## See Also
 
-Acceptance criteria are per-task and answer "did we build the right thing?". They sit on top of the project-wide Definition of Done, the standing bar every task clears before it counts as done. See `references/definition-of-done.md`.
+Acceptance criteria are per-task and answer "did we build the right thing?". They sit on top of the project-wide Definition of Done, the standing bar every task clears before it counts as done. See `../../references/definition-of-done.md`.

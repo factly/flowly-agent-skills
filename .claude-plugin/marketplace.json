@@ -9,6 +9,7 @@
   "plugins": [
     {
       "name": "flowly",
+      "version": "0.1.0",
       "source": "./",
       "description": "Production-grade engineering skills covering every phase of software development: define, plan, build, verify, review, and ship.",
       "homepage": "https://github.com/factly/flowly-agent-skills",
