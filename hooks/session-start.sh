@@ -2,6 +2,16 @@
 # agent-skills session start hook
 # Injects the flowly-catalog skill into every new session
 #
+# Every output path must emit the SessionStart envelope
+#   {"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "..."}}
+# quoted from https://code.claude.com/docs/en/hooks#sessionstart
+#
+# Claude Code reads stdout as JSON whenever its first non-whitespace character
+# is `{`, and injects nothing but additionalContext. A well-formed object
+# carrying any other key is therefore parsed and then discarded in silence -
+# no error, no non-zero exit, nothing logged back here. Changing these keys
+# does not break loudly; it stops working.
+#
 # Runtime dependency: bash (3.2 or newer) and nothing else. The JSON payload is
 # built with shell builtins only - no jq, no node, no coreutils - so the hook
 # works on a machine with an empty PATH. hooks/session-start-test.sh runs it
@@ -93,10 +103,11 @@ build_catalog_message() {
 
 # `-r` as well as `-f`: a catalog that exists but cannot be read would pass the
 # `-f` test and then produce a payload containing the preface and nothing else,
-# announcing IMPORTANT with no catalog in it. Better to say so.
+# injecting a claim that the catalog is loaded with no catalog behind it.
+# Better to say so.
 if [ -f "$META_SKILL" ] && [ -r "$META_SKILL" ]; then
   build_catalog_message
-  printf '{"priority":"IMPORTANT","message":"%s"}\n' "$json_escaped"
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$json_escaped"
 else
   # The resolved path is deliberately not interpolated here. A directory name
   # may legally contain a newline, and json_escape_chunk is newline-free by
@@ -104,5 +115,5 @@ else
   # the one emitting invalid JSON. The expected location is fixed, so name that.
   json_escape_chunk "agent-skills: the flowly-catalog skill catalog was not found or could not be read. Expected skills/flowly-catalog/SKILL.md next to this hook's parent directory. Skills remain available individually."
   json_escape_controls "$json_escaped"
-  printf '{"priority":"INFO","message":"%s"}\n' "$json_escaped"
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":"%s"}}\n' "$json_escaped"
 fi
