@@ -452,6 +452,40 @@ jobs:
       - name: Marketplace and plugin manifests validate with warnings fatal
         run: claude plugin validate --strict .
 
+  manifest-versions:
+    name: Manifest versions
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Separate from the `manifests` job above, which shells out to a `claude`
+      # install to validate manifest SHAPE. This one is plain node and checks a
+      # different thing: that the two files agree on a number. Keeping them
+      # apart means a slow npm install cannot make this gate flaky, and a red
+      # badge names which of the two questions failed.
+      #
+      # NO `git describe` HERE, DELIBERATELY. Upstream's validate-versions.js
+      # derived the expected version from the nearest tag and was deleted for
+      # it: the call was unguarded and exits non-zero on a tagless clone, and
+      # actions/checkout is shallow by default, so its answer depended on CI's
+      # fetch depth rather than on the repository. See NOTICE.md § Removed at
+      # import. That is also why this job needs no fetch-depth: 0 — it reads two
+      # files and asks git nothing.
+      #
+      # The honest limit is in the script's header: two agreeing sources are one
+      # source, and both being wrong together passes. The independent third
+      # source is a tag, read via `--tag`, and a release job is the only place
+      # one is guaranteed to exist. That mode is not wired here on purpose.
+      - name: The manifest-version checker works
+        run: node --test scripts/check-manifest-versions-test.js
+
+      - name: Both shipped manifests declare the same version
+        run: node scripts/check-manifest-versions.js
+
   install:
     name: Install door
     runs-on: ubuntu-latest
@@ -546,6 +580,7 @@ jobs:
       - evals
       - hooks
       - manifests
+      - manifest-versions
       - install
       - ci-coverage
     steps:
