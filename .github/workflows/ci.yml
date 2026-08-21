@@ -112,6 +112,39 @@ jobs:
       - name: Every skill is valid under the open standard, two fields only
         run: bash scripts/validate-standard.sh
 
+  reference-links:
+    name: Reference links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Inherited from upstream and kept at their path, byte for byte, on
+      # purpose: this is a checker the fork wants but does not want to own.
+      # Renaming it — the reflex, given every other gate here is `check-*` —
+      # would move its register row from `unchanged` to `owned` and make every
+      # future merge of it a conflict to resolve, forever, in exchange for a
+      # tidier filename.
+      #
+      # The bug class is one this fork demonstrably had. A `references/<file>.md`
+      # link inside a SKILL.md resolves from the skill's OWN directory, two
+      # levels below the repo root, so it silently points at nothing: 15 of the
+      # 16 such links in the tree were broken, and no gate here could see them
+      # because a dead relative link is not a syntax error. Upstream fixed 11 of
+      # them in the same window this checker arrived in; the last one was
+      # fork-authored, so only this gate would ever have caught it.
+      #
+      # The checker first, then its verdict — a broken checker's green says
+      # nothing about the corpus.
+      - name: The reference-link checker works
+        run: node --test scripts/validate-reference-links-test.js
+
+      - name: Every references/ link in a SKILL.md resolves to a file that exists
+        run: node scripts/validate-reference-links.js
+
   # ── The one-way door ────────────────────────────────────────────────────────
 
   hosts:
@@ -501,6 +534,7 @@ jobs:
     needs:
       - skills
       - standard
+      - reference-links
       - hosts
       - binding
       - register

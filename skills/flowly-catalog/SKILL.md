@@ -200,7 +200,7 @@ Touch only what the task asks for. Do not remove comments you do not understand,
 
 Every skill ends in a verification step, and a task is not done until it passes. "Seems right" is never evidence; a passing test, a build output or runtime data is.
 
-Per-skill verification is the local check. The bar that applies to *every* change regardless of skill is the Definition of Done — tests pass, no regressions, behaviour verified at runtime, docs updated (`references/definition-of-done.md`). It complements a task's acceptance criteria; it does not replace them.
+Per-skill verification is the local check. The bar that applies to *every* change regardless of skill is the Definition of Done — tests pass, no regressions, behaviour verified at runtime, docs updated (`../../references/definition-of-done.md`). It complements a task's acceptance criteria; it does not replace them.
 
 ## Failure Modes to Avoid
 
