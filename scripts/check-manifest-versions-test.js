@@ -174,6 +174,43 @@ test('--tag accepts a ref without the leading v', () => {
   assert.equal(code, 0);
 });
 
+test('--tag accepts the {name}--v form that `claude plugin tag` mints', () => {
+  // The first-party tagger namespaces refs per plugin, because a marketplace may
+  // hold several. Rejecting that form made `claude plugin tag --push` produce a
+  // ref this repo's own release gate refused — discovered mid-publish, and reading
+  // as a broken release rather than as two conventions.
+  const { code, out } = run(sandbox(pluginAt('0.1.0'), marketAt('0.1.0')), [
+    '--tag',
+    'flowly--v0.1.0',
+  ]);
+  assert.equal(code, 0, out);
+  assert.match(out, /matches the manifests/);
+});
+
+test('--tag strips the plugin prefix rather than merely tolerating one', () => {
+  // The discriminating case. An implementation that ignored anything before the
+  // last `v` — or matched the version as a substring — would pass the test above
+  // and accept this too, which claims 0.1.0 while naming 0.9.9.
+  const { code, out } = run(sandbox(pluginAt('0.1.0'), marketAt('0.1.0')), [
+    '--tag',
+    'flowly--v0.9.9',
+  ]);
+  assert.equal(code, 1, out);
+  assert.match(out, /does not match/);
+});
+
+test('--tag does not strip a prefix belonging to another plugin', () => {
+  // `other--v0.1.0` is a sibling plugin's release in a shared marketplace. It
+  // names our version by coincidence and is still not our tag.
+  const { code } = run(sandbox(pluginAt('0.1.0'), marketAt('0.1.0')), ['--tag', 'other--v0.1.0']);
+  assert.equal(code, 1);
+});
+
+test('a rejected ref names the spellings that would have been accepted', () => {
+  const { out } = run(sandbox(pluginAt('0.1.0'), marketAt('0.1.0')), ['--tag', 'v0.2.0']);
+  assert.match(out, /flowly--v0\.1\.0/);
+});
+
 test('--tag fails when a release would publish a ref the manifests do not claim', () => {
   const { code, out } = run(sandbox(pluginAt('0.1.0'), marketAt('0.1.0')), ['--tag', 'v0.2.0']);
   assert.equal(code, 1, out);

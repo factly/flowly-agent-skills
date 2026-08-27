@@ -90,9 +90,9 @@ Already installed? How you roll the pack out depends on your codebase. The **[Ad
 
 ---
 
-## All 33 Skills
+## All 34 Skills
 
-The pack includes 33 skills total — 32 lifecycle skills plus the `flowly-catalog` router. Ten of them are ours, the `flowly-` prefixed set; the other 23 are inherited. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
+The pack includes 34 skills total — 33 lifecycle skills plus the `flowly-catalog` router. Eleven of them are ours, the `flowly-` prefixed set; the other 23 are inherited. Each skill is a structured workflow with steps, verification gates, and anti-rationalization tables. You can also reference any skill directly.
 
 The Flowly set covers each of the six phases, plus two that sit under all of them: `flowly-connect`, because every other one assumes the door is open, and `flowly-loop-runs`, because a run spans the plan and build phases rather than sitting in either.
 
@@ -240,10 +240,10 @@ Every skill follows a consistent anatomy:
 
 ```
 flowly-agent-skills/
-├── skills/                            # 33 skills (32 lifecycle + the catalog that routes to them)
-├── agents/                            # 4 specialist personas
+├── skills/                            # 34 skills (33 lifecycle + the catalog that routes to them)
+├── agents/                            # 5 specialist personas
 ├── references/                        # 7 supplementary checklists
-├── commands/                          # the 6 lifecycle commands, each taking an issue identifier
+├── commands/                          # 6 lifecycle commands + /flowly:batch, which takes a set
 ├── hooks/                             # session lifecycle hooks
 ├── evals/                             # skill eval cases + framework
 ├── scripts/                           # the structural gates (see below)
@@ -270,7 +270,7 @@ which is the only reason to believe it works:
 |---|---|---|
 | `node scripts/validate-skills.js` | Frontmatter, description trigger and length, required sections, `name` matches the directory | A required section is deleted |
 | `./scripts/validate-standard.sh` | Frontmatter carries exactly `name` and `description` | Any third key is added |
-| `node scripts/check-commands.js` | Exactly six commands, each with a description, no substitution token in any body, the identifier-resolution block verbatim in all six, every named skill resolving, and a rendered size under Codex's migration cap | A substitution token is added to a command body |
+| `node scripts/check-commands.js` | Exactly the commands `COMMANDS` names, each with a description, no substitution token in any body, the resolution block verbatim in each — the single-issue form, or the set form for `/flowly:batch` — every named skill resolving, and a rendered size under Codex's migration cap | A substitution token is added to a command body |
 | `node scripts/check-no-hosts.js` | No hostname outside a curated allowlist, and no absolute workspace path, anywhere in the tree | Any new hostname appears |
 | `node scripts/check-register.js` | Every shipped file is registered exactly once, the base SHA is an ancestor of `HEAD`, and every `unchanged` file really is byte-identical to it | A file is added without a register row |
 | `node scripts/check-binding.js` | No shipped file names a planning destination this distribution does not have, and every rebound file names the Flowly capability that replaced it | A skill is rebound by deleting a path without naming its successor |

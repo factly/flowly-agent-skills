@@ -123,8 +123,8 @@ The mode word goes *before* the identifier, not after the command: `/flowly:buil
 works the whole plan in one pass.
 
 Two skills have no command of their own. `code-simplification` is reached from
-`/flowly:review`, and `web-performance-auditor` is a persona you ask for by agent type — this
-fork ships six commands and none of them is a performance audit.
+`/flowly:review`, and `web-performance-auditor` is a persona you ask for by agent type — no
+command in this fork is a performance audit.
 
 ## Using References
 

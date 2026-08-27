@@ -36,8 +36,10 @@
  * The independent third source is a tag, and the one place it is safe to read
  * one is a release job, where a tag is guaranteed to exist because publishing
  * it is what triggered the run. `--tag <ref>` is that mode: it asserts the
- * manifests match the ref a release is publishing under, accepting a leading
- * `v`. It is deliberately not wired into CI, for the same reason
+ * manifests match the ref a release is publishing under, accepting a bare
+ * version, a leading `v`, and the `{name}--v` form `claude plugin tag` mints —
+ * see the comment at the comparison for why all three. It is deliberately not
+ * wired into CI, for the same reason
  * `validate-standard.sh --reference` is not — a mode that cannot run on an
  * ordinary push does not belong on the critical path of one.
  *
@@ -170,9 +172,28 @@ function checkVersions(root, tag, report) {
   report.pass(`both manifests declare ${pluginVersion} for "${pluginName}"`);
 
   if (tag !== null) {
-    const wanted = tag.replace(/^v/, '');
+    // TWO SPELLINGS, because two taggers exist and both are legitimate.
+    //
+    // This fork publishes `v0.2.0`, and `v0.1.0` is already on origin. Claude
+    // Code's own `claude plugin tag` publishes `{name}--v{version}` —
+    // `flowly--v0.2.0` — and validates the same agreement this file does before
+    // creating it. Accepting only the bare form meant the first-party command
+    // produced a ref this repository's own release gate rejected, which reads as
+    // a broken release rather than as two conventions, and would be discovered
+    // mid-publish.
+    //
+    // The `{name}--` prefix exists because a marketplace may hold several
+    // plugins, so its tags have to be namespaced per plugin. We hold one, which
+    // is why the bare form was ever sufficient — not a reason it will stay so.
+    //
+    // Prefix stripped by string comparison rather than a built regex: the name
+    // comes from `plugin.json`, and interpolating it into a pattern would let a
+    // metacharacter in it decide what matches.
+    const prefix = `${pluginName}--`;
+    const wanted = (tag.startsWith(prefix) ? tag.slice(prefix.length) : tag).replace(/^v/, '');
     if (wanted !== pluginVersion) {
       report.error(`release ref ${tag} does not match the manifests' ${pluginVersion}`);
+      report.detail(`accepted spellings: ${pluginVersion}, v${pluginVersion}, ${prefix}v${pluginVersion}`);
       return errors + 1;
     }
     report.pass(`release ref ${tag} matches the manifests`);

@@ -10,9 +10,9 @@ This is the flowly-agent-skills project — a collection of production-grade eng
 
 ```
 skills/       → Core skills (SKILL.md per directory)
-agents/       → Reusable agent personas (code-reviewer, test-engineer, security-auditor, web-performance-auditor)
+agents/       → Reusable agent personas (code-reviewer, test-engineer, security-auditor, web-performance-auditor, implementer)
 hooks/        → Session lifecycle hooks
-commands/     → The six lifecycle commands, each taking a Flowly issue identifier (/flowly:research, /flowly:plan, /flowly:build, /flowly:test, /flowly:review, /flowly:ship)
+commands/     → The six lifecycle commands, each taking one Flowly issue identifier (/flowly:research, /flowly:plan, /flowly:build, /flowly:test, /flowly:review, /flowly:ship), plus /flowly:batch, which is not a phase and takes a set of them
 .claude/rules/ → Repo-scoped rules for agents working here
 references/   → Supplementary checklists (testing, performance, security, accessibility, observability)
 scripts/      → Validators and the eval harness (plain Node, no build step)

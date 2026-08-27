@@ -3,7 +3,7 @@
 Claude Code is the door this distribution ships, and the only one it tests. Everything below is
 written for it.
 
-Installing the plugin gives you 33 skills, six lifecycle commands and four agent personas. It does
+Installing the plugin gives you 34 skills, seven commands and five agent personas. It does
 **not** give you a Flowly instance and it does not give you a credential for one. Those are separate,
 they come from whoever runs your instance, and without them the Flowly skills install cleanly and
 then fail at the first tool call. Get them first.
