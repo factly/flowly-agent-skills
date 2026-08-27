@@ -36,7 +36,7 @@ Pick this when there's a repeatable workflow you'd otherwise re-explain every ti
 
 - `/flowly:review` → wraps `code-reviewer` with the project's review skill
 - `/flowly:test` → wraps `test-engineer` with TDD skill
-- `web-performance-auditor` has no command wrapping it. This fork ships six commands and none of them is a performance audit; ask for the persona by agent type, or use the `performance-optimization` skill.
+- `web-performance-auditor` has no command wrapping it. No command in this fork is a performance audit; ask for the persona by agent type, or use the `performance-optimization` skill.
 
 ### Slash command (orchestrator — fan-out)
 Pick this only when **independent** investigations can run in parallel and produce reports that a single agent then merges.
