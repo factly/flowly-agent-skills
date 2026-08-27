@@ -242,7 +242,7 @@ Every skill follows a consistent anatomy:
 flowly-agent-skills/
 ├── skills/                            # 34 skills (33 lifecycle + the catalog that routes to them)
 ├── agents/                            # 5 specialist personas
-├── references/                        # 7 supplementary checklists
+├── references/                        # 8 supplementary checklists
 ├── commands/                          # 6 lifecycle commands + /flowly:batch, which takes a set
 ├── hooks/                             # session lifecycle hooks
 ├── evals/                             # skill eval cases + framework
