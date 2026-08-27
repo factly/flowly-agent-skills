@@ -486,6 +486,30 @@ jobs:
       - name: Both shipped manifests declare the same version
         run: node scripts/check-manifest-versions.js
 
+  corpus-counts:
+    name: Corpus counts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # Its own job rather than a step on `catalog`, which is the nearest
+      # neighbour and the wrong owner. `catalog` holds the catalog index to the
+      # skills tree; a wrong number in README.md is neither the catalog's fault
+      # nor its file, and reporting it as "Skill catalog: fail" points the next
+      # reader at the wrong place. The named job IS the failure attribution.
+      #
+      # Reads only the filesystem and two markdown files — no git, no network, so
+      # nothing here depends on fetch depth.
+      - name: The corpus-count checker works
+        run: node --test scripts/check-corpus-counts-test.js
+
+      - name: The advertised totals match the tree
+        run: node scripts/check-corpus-counts.js
+
   install:
     name: Install door
     runs-on: ubuntu-latest
@@ -581,6 +605,7 @@ jobs:
       - hooks
       - manifests
       - manifest-versions
+      - corpus-counts
       - install
       - ci-coverage
     steps:
