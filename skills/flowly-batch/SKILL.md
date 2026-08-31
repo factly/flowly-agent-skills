@@ -1,6 +1,6 @@
 ---
 name: flowly-batch
-description: Works a named batch of Flowly issues to done in one pass — a set-targeted loop run holds the whole queue, drives each issue through its status and its tests, and hands the batch to a human once as an evidence packet. Use when several already-understood fixes should be worked in one pass, use when resuming a batch a previous session left part-way, and use when the per-issue research and approval ceremony is not worth paying several times over.
+description: Works a named batch of Flowly issues to done in one pass — a set-targeted loop run holds the whole queue, drives each issue through its status and its tests, and hands the batch to a human once as an evidence packet. Use when one or more already-understood fixes should be worked in one pass, use when resuming a batch a previous session left part-way, and use when the per-issue research and approval ceremony is not worth paying several times over.
 ---
 
 # Working a batch of issues in Flowly
@@ -11,17 +11,20 @@ Every other Flowly lifecycle command takes exactly one issue, and each one that 
 
 A batch is the other shape. **One run holds the whole queue.** A loop run whose target is a *set* of issues carries the list, accumulates the evidence as the work goes, and reaches `awaiting_review` once — which is the single place a human looks at all of it.
 
+**A set of one is a legal set.** The only floor is the empty one; nothing has ever refused a single-member run. What it buys is the paragraph above without the arithmetic of the one before it — a tracked run, an evidence packet, and one `awaiting_review` that actually tells the team — for an issue that is understood but has no plan and no children, which no other command in this pack will take. What it does not buy is a way around a plan. An issue that needs one still needs one, and a single-member batch is precisely the shape that makes skipping that gate look reasonable.
+
 The run is the batch. There is no checklist file, no parent issue and no plan document; position lives in the issues' own statuses and in the run's membership rows, which is what makes an interrupted batch resumable by a session that remembers nothing.
 
 ## When to Use
 
 - Several small issues are already understood and need working in one pass
+- **One issue is already understood and has no plan and no children** — `/flowly:build` will not take it, because it checks the plan gate and then works children that do not exist
 - A previous session stopped part-way through a batch and it needs picking up
 - A set of fixes is too small each to justify the planning-doc ceremony, and too many to want five separate approvals
 
 **When NOT to use:**
 
-- **One issue.** Use the ordinary build loop; a batch of one is ceremony with no payoff.
+- **An issue whose plan is approved.** Its children carry the order conversion produced, and `flowly-build` walks them one at a time. A batch would take the parent as one undifferentiated unit and collapse every child's rollback point into one.
 - **Issues that are not yet understood.** A batch works a queue; it does not decide what the work is. If any member needs research or a design decision, it needs a plan, and it is not a batch member.
 - **Issues that depend on each other.** A batch has an order but no dependency graph, and it will not re-order or stop when a later issue turns out to need an earlier one. Related work belongs under a plan whose conversion produces ordered children.
 - **A parent issue's children.** Those already have a plan and an order. Build them.
@@ -125,6 +128,7 @@ In every case: comment on the issue in flight, attach the note, advance to `awai
 | "This issue touches both repos, so it is one commit each way — I'll mark it done after the first" | `done` means every repository it touched is committed. Half-committed and `done` is a tracker that lies to the next run. |
 | "The batch broke, I'll mark the run failed" | Failed is terminal and cannot be resumed. An interrupted batch is not a finished one — comment, attach a note, and take it to `awaiting_review`. |
 | "I'll plan each of these properly first" | Then they are not a batch. The whole point is the issues are already understood; if one is not, it needs a plan and does not belong here. |
+| "It's one issue and it needs a plan, but a batch of one takes it — I'll go that way" | A set of one is legal because some understood issues have no plan to need. That is not a shortcut past a plan that is needed. If you cannot state the issue's acceptance before starting, it wants `/flowly:plan`, and the single-member run is just the gate-dodge with a run id attached. |
 | "These issues are related, so a batch keeps them together" | A batch has an order, not a dependency graph. It will not stop when a later issue needs an earlier one. Related work belongs under a plan. |
 | "I'll start a fresh run, it's simpler than finding the old one" | A second run over the same issues means two runs claiming the same work and one evidence packet that describes half of it. Look the run up by any member first. |
 | "Nobody needs telling, the work is in the tracker" | Status writes and comments on an unassigned issue reach no inbox. Only the run reaching `awaiting_review` notifies the team. Skipping it means the work is done and nobody knows. |
@@ -146,6 +150,7 @@ In every case: comment on the issue in flight, attach the note, advance to `awai
 - The batch finished without the run ever reaching `awaiting_review`
 - An issue widened mid-batch to absorb something the batch did not plan for
 - A batch whose members turn out to depend on each other, worked anyway
+- A single-member batch over an issue whose acceptance could not be stated before the work started
 - An issue marked `done` on the strength of the digest rather than of the commits
 - A subagent handed a git command, a status write or `attach_evidence` to call
 - A digest accepted whose verification field carries a verdict but no command text

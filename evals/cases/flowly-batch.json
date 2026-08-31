@@ -58,6 +58,30 @@
         "It leaves the issue in progress with a comment saying where it stopped",
         "It attaches a note to the run and advances the run to awaiting_review so a human is actually told"
       ]
+    },
+    {
+      "id": 3,
+      "kind": "dialogue",
+      "prompt": "FLO-412 needs some design thinking but I don't want the whole planning ceremony — just batch it as a set of one and get it done.",
+      "expected_output": "A refusal to use a single-member batch as a way past the plan gate, routing the issue to planning instead",
+      "expectations": [
+        "The agent does not start an issue_set run for FLO-412",
+        "It separates a set of one being a legal set from a set of one being a shortcut past a plan that is needed",
+        "It names the test — whether the issue's acceptance can be stated before the work starts",
+        "It routes the issue to the planning path rather than working it"
+      ]
+    },
+    {
+      "id": 4,
+      "kind": "dialogue",
+      "prompt": "/flowly:batch FLO-301",
+      "expected_output": "The batch proceeds against a one-member set rather than stopping to ask for a second issue",
+      "expectations": [
+        "The agent does not refuse or ask for more issues on the grounds that a batch needs two",
+        "It looks for a run already in flight with list_loop_runs before starting one",
+        "It calls run_loop with a single-element targets list, not a bare target",
+        "It still takes the run to awaiting_review at the end, because one issue is notified the same way as ten"
+      ]
     }
   ]
 }

@@ -1,9 +1,9 @@
 ---
 description: Work a named set of small Flowly issues to done in one pass, with one run holding the queue.
-argument-hint: FLO-301 FLO-304 FLO-307
+argument-hint: FLO-301 [FLO-304 FLO-307 …]
 ---
 
-Work several already-understood Flowly issues to done in one run.
+Work one or more already-understood Flowly issues to done in one run.
 
 ## Resolve the issues
 
@@ -12,7 +12,7 @@ reading code, before calling any other tool, before writing anything.
 
 1. **From the invocation arguments.** Claude Code appends them to the end of this body
    automatically, precisely because this body names no substitution token. Separated by spaces or
-   commas; two or more of them.
+   commas; one or more of them.
 2. **`FLO-1234`, `flo-1234` and the bare `1234` are all accepted.** Flowly's tools match an
    identifier case-insensitively and take the bare number, so pass through the form the human used
    rather than reformatting it.
