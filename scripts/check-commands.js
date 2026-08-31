@@ -173,7 +173,7 @@ const CANONICAL_BATCH_BLOCK = [
   '',
   '1. **From the invocation arguments.** Claude Code appends them to the end of this body',
   '   automatically, precisely because this body names no substitution token. Separated by spaces or',
-  '   commas; two or more of them.',
+  '   commas; one or more of them.',
   '2. **`FLO-1234`, `flo-1234` and the bare `1234` are all accepted.** Flowly\'s tools match an',
   '   identifier case-insensitively and take the bare number, so pass through the form the human used',
   '   rather than reformatting it.',
